@@ -1,0 +1,30 @@
+Manifest-Version: 1.0
+Automatic-Module-Name: marsRover
+Bundle-ManifestVersion: 2
+Bundle-Name: marsRover
+Bundle-Vendor: My Company
+Bundle-Version: 1.0.0.qualifier
+Bundle-SymbolicName: marsRover; singleton:=true
+Bundle-ActivationPolicy: lazy
+Require-Bundle: org.eclipse.xtext,
+ org.eclipse.xtext.xbase,
+ org.eclipse.equinox.common;bundle-version="3.5.0",
+ org.eclipse.emf.ecore,
+ org.eclipse.xtext.xbase.lib;bundle-version="2.14.0",
+ org.eclipse.xtext.util,
+ org.eclipse.emf.common,
+ org.eclipse.xtend.lib;bundle-version="2.14.0",
+ org.antlr.runtime;bundle-version="[3.2.0,3.2.1)"
+Bundle-RequiredExecutionEnvironment: JavaSE-10
+Export-Package: mars.rover.generator,
+ mars.rover.dSL.util,
+ mars.rover,
+ mars.rover.dSL.impl,
+ mars.rover.parser.antlr,
+ mars.rover.serializer,
+ mars.rover.parser.antlr.internal,
+ mars.rover.validation,
+ mars.rover.scoping,
+ mars.rover.dSL,
+ mars.rover.services
+Import-Package: org.apache.log4j

@@ -1,0 +1,115 @@
+grammar mars.rover.DSL with org.eclipse.xtext.common.Terminals
+
+generate dSL "http://www.rover.mars/DSL"
+
+Mission:
+	'MissionName:' name = ID
+	'DefaultSpeed:' speed = INT
+	'BorderColor:' color = Color
+	'Timeout:' duration = Duration
+	(CreateReport ?= 'CreateReport')?
+	'Tasks:' (tasks += Task)+
+;
+
+Task:
+	'Task:' name = Name
+;
+
+Duration:
+	dl = INT unit = TimeUnit
+;
+
+Name:
+	FindLakes | PushBricks | ParkRover | Celebrate | MapTerrain 
+;
+
+FindLakes:
+	'FindLakes'
+	('Timeout:' (duration = Duration | 'untilTermination'))?
+	'SearchPolicy:' policy = Policy
+;
+
+Policy:
+	{Policy} 'Everything' | ColorBased
+;
+
+ColorBased:
+	'colorBased'
+	'UnkownLakePolicy:' lakepolicy = LakePolicy
+	(lakes += Lake)+
+;
+
+Lake:
+	'Lake:'
+		'Color:' color = Color
+		('MeasureFeatures:' (features += Feature)+)?
+;
+
+Feature:
+	'Feature:' type = FeatureType
+;
+
+PushBricks:
+	'PushBricks'
+	('Timeout:' (duration = Duration | 'untilTermination'))?
+	'Amount:' number = INT
+;
+
+ParkRover:
+	'ParkRover' 'in' position = Position orientation = Orientation
+;
+
+Celebrate:
+	'Celebrate' 'with' celebrate = Celebration
+;
+
+enum Celebration:
+	SPIN = 'spin' | 
+	SING = 'sing'
+;
+
+MapTerrain:
+	{MapTerrain} 'MapTerrain'
+	('Timeout:' (duration = Duration | 'untilTermination'))?
+;
+
+enum Position:
+	CORNER = 'corner' |
+	EDGE = 'edge'
+;
+
+enum Orientation:
+	FRONT = 'front' |
+	BACK = 'back'
+;
+
+enum FeatureType:
+	TEMPERATURE = 'temperature' |
+	DEPTH = 'depth' |
+	SALINTY = 'salinity'
+;
+
+enum LakePolicy:
+	MEASURE = 'measure' |
+	AVOID = 'avoid'
+;
+
+enum Color:
+	WHITE = 'white' |
+	BLACK = 'black' |
+	RED = 'red' |
+	BLUE = 'blue' |
+	YELLOW = 'yellow' |
+	GREEN = 'green'
+;
+
+enum TimeUnit:
+	SECONDS = 'sec' |
+	MINUTE = 'min' |
+	HOURS = 'hrs'
+;
+
+
+
+
+	
