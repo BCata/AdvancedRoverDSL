@@ -9,7 +9,7 @@ from ev3dev2.sound import Sound
 from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
 from ev3dev2.motor import LargeMotor, MoveTank, OUTPUT_A, OUTPUT_B, OUTPUT_D, SpeedPercent
 from ev3dev2.motor import MediumMotor
-from ev3dev2.sensor.lego import TouchSensor, ColorSensor, UltrasonicSensor
+from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor
 
 import AdvancedRoverBluetooth as arb
 
@@ -20,6 +20,8 @@ RED = ColorSensor.COLOR_RED
 BLUE = ColorSensor.COLOR_BLUE
 YELLOW = ColorSensor.COLOR_YELLOW
 GREEN = ColorSensor.COLOR_GREEN
+
+value = 0
 
 color_found = {
     RED: False,
@@ -116,10 +118,10 @@ def collision_protocol2(color_sensor_tuple):
     leds.set_color("LEFT", "GREEN") 
     leds.set_color("RIGHT", "GREEN")
 
-def backup_collision_protocol(color_sensor_tuple):
+def color_collision_protocol(color_sensor_tuple):
     leds.set_color("LEFT", "RED") 
     leds.set_color("RIGHT", "RED")
-    
+
     if color_sensor_tuple[0]:
         both_wheels.off()
         move_back(15, TIME)
@@ -132,13 +134,45 @@ def backup_collision_protocol(color_sensor_tuple):
         turn_left(30,TIME)
     elif color_sensor_tuple[1]:
         move_back(15, 2)
-    elif us_back.value()/10 >= 4:
+        if random.randint(1,2) == 1:
+            turn_left(-10, TIME)
+            turn_right(10,TIME)
+        else:
+            turn_right(-10, TIME)
+            turn_left(10,TIME)
+    if us_back.value()/10 >= 4:
         both_wheels.off()
         sleep(0.5)
         move_both_for_seconds(30, TIME)
 
     leds.set_color("LEFT", "GREEN") 
     leds.set_color("RIGHT", "GREEN")
+
+def ultrasonic_collision_protocol():
+    leds.set_color("LEFT", "RED") 
+    leds.set_color("RIGHT", "RED")
+
+    both_wheels.off()
+    move_back(15, TIME)
+    if random.randint(1,2) == 1:
+        turn_left(-30, TIME)
+        turn_right(30,TIME)
+    else:
+        turn_left(30, TIME)
+        turn_right(-30,TIME)
+
+    leds.set_color("LEFT", "GREEN") 
+    leds.set_color("RIGHT", "GREEN")
+
+def touch_collision_protocol(touch_sensor_tuple):
+    both_wheels.off()
+    move_back(15, TIME)
+    if(touch_sensor_tuple[0]):
+        turn_left(-30, TIME)
+        turn_right(30,TIME)
+    elif(touch_sensor_tuple[1]):
+        turn_left(30, TIME)
+        turn_right(-30,TIME)
 
 def generate_measurement_value(measurement):
     if(measurement == "temp"):
@@ -149,6 +183,8 @@ def generate_measurement_value(measurement):
         return ("salinity",str(round(random.uniform(0.1, 35),3)), "per mille")
 
 def position_rover_for_measurement(lake_color):
+    counter = 0
+
     while cs_middle.color != lake_color or cs_left.color == lake_color or cs_right.color == lake_color:
         if(cs_left.color == lake_color):
             turn_left(10, 0.4)
@@ -157,7 +193,9 @@ def position_rover_for_measurement(lake_color):
             turn_left(-10, 0.4)
             turn_right(10, 0.4)
         else:
-            move_both_for_seconds(10, 0.4)
+            if counter < 4:
+                move_both_for_seconds(10, 0.4)
+                counter += 1
 
 def measure_lake(color):
     if(len(measurements[color]) != 0):
@@ -165,7 +203,7 @@ def measure_lake(color):
         lower_arm()
         for measure in measurements[color]:
             text = generate_measurement_value(measure)
-            s.speak(text[0] + text[1] + text[2])
+            # s.speak(text[0] + text[1] + text[2])
         raise_arm()
 
 def process_lake(color_val, color_name):
@@ -188,7 +226,7 @@ def detect_lakes(color_sensor_tuple, lakes):
             if color == GREEN and not color_found[GREEN]:
                 process_lake(GREEN, "Green")
 
-    backup_collision_protocol(color_sensor_firing)
+    color_collision_protocol(color_sensor_firing)
 
 def mission_ongoing(lakes):
     found_lakes = True
@@ -196,21 +234,26 @@ def mission_ongoing(lakes):
         found_lakes = found_lakes and color_found[lake]
     return not found_lakes
 
+def decode_message():
+    return arb.read_message()
 
 if __name__ == "__main__":
-    # sock, sock_in, sock_out = arb.connect()
-    # listener = threading.Thread(target=arb.listen, args=(sock_in, sock_out, mission_ongoing))
-    # listener.start()
-    # cs_left.calibrate_white()
-    # cs_middle.calibrate_white()
-    # cs_right.calibrate_white()
+    sock, sock_in, sock_out = arb.connect()
+    listener = threading.Thread(target=arb.listen, args=(sock_in, sock_out, mission_ongoing))
+    listener.start()
 
     lakes_to_find = (RED, GREEN, BLUE)
 
     while mission_ongoing(lakes_to_find):
-        backup_collision_protocol(detect_line())
+        color_collision_protocol(detect_line())
         detect_lakes(detect_color(), lakes_to_find)
         move_both(SPEED)
+        if decode_message()[0] == "ultrasonic":
+            ultrasonic_collision_protocol()
+            arb.set_message(("clear",None))
+        if decode_message()[0] == "touch":
+            touch_collision_protocol(decode_message()[1])
 
     both_wheels.off()
-    s.speak("Mission completed")
+    arb.write_to_socket(sock_out, False)
+    s.speak("Mission")

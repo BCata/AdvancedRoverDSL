@@ -2,9 +2,10 @@
 
 import bluetooth
 
-SERVER_MAC = 'CC:78:AB:50:B2:46'
+# SERVER_MAC = 'CC:78:AB:50:B2:46' # brick 11
+SERVER_MAC = '00:17:E9:B2:1E:41' # brick 9
 
-angle = 0
+message = ("clear", None)
 
 def connect():
     port = 3
@@ -19,14 +20,24 @@ def connect():
 def disconnect(sock):
     sock.close()
 
-def write_to_socket(sock_out, signal):
-    sock_out.write(str(signal) + '\n')
+def write_to_socket(sock_out, message):
+    sock_out.write(str(message) + '\n')
     sock_out.flush()
 
+def read_message():
+    return message
+
+def set_message(value):
+    global message
+    message = value
+
 def listen(sock_in, sock_out, mission_ongoing):
-    global angle
-    
+    global message
+
     while mission_ongoing:
-        angle = int(sock_in.readline())
-        # print("AngleBluetoothListener: ", angle)
+        # converting serialized string to tuple
+        # each tupple is formed of the sensor from which the
+        # information come and the value given by that sensor
+        message = eval(sock_in.readline())
+        # print("Bluetooth received: ", message)
 
