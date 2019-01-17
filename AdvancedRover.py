@@ -44,7 +44,7 @@ measurements = {
 current_ultrasonic_distance = 0
 previous_ultrasonic_distance = 0
 bricks_to_push = 1
-pushing_bricks = True
+bricks_pushed = False
 
 s = Sound()
 leds = Leds()
@@ -170,24 +170,20 @@ def color_collision_protocol(color_sensor_tuple):
 
 
 def ultrasonic_collision_protocol():
-    if not pushing_bricks:
-        both_wheels.off()
-        leds.set_color("LEFT", "RED")
-        leds.set_color("RIGHT", "RED")
+    both_wheels.off()
+    leds.set_color("LEFT", "RED")
+    leds.set_color("RIGHT", "RED")
 
-        move_back(15, TIME)
-        if random.randint(1, 2) == 1:
-            turn_left(-30, TIME)
-            turn_right(30, TIME)
-        else:
-            turn_left(30, TIME)
-            turn_right(-30, TIME)
-
-        leds.set_color("LEFT", "GREEN")
-        leds.set_color("RIGHT", "GREEN")
-
+    move_back(15, TIME)
+    if random.randint(1, 2) == 1:
+        turn_left(-30, TIME)
+        turn_right(30, TIME)
     else:
-        pass
+        turn_left(30, TIME)
+        turn_right(-30, TIME)
+
+    leds.set_color("LEFT", "GREEN")
+    leds.set_color("RIGHT", "GREEN")
 
 
 def touch_collision_protocol(touch_sensor_tuple):
@@ -277,7 +273,7 @@ def mission_ongoing():
         return False
 
     # if all missions completed
-    if lakes_found:
+    if lakes_found and bricks_pushed:
         return False
 
     return True
@@ -287,11 +283,37 @@ def decode_message():
     return arb.read_message()
 
 
-def push_bricks():
-    if current_ultrasonic_distance != 0:
-        # we detected something
-        ultrasonic_collision_protocol()
+def detect_ultrasonic():
+    global bricks_to_push, previous_ultrasonic_distance, current_ultrasonic_distance, bricks_pushed
 
+    # detect ultrasonic input from secondary brick
+    message = decode_message()
+
+    if bricks_to_push == 0:
+        bricks_pushed = True
+
+    if message[0] == "ultrasonic":
+        previous_ultrasonic_distance = current_ultrasonic_distance
+        current_ultrasonic_distance = message[1]
+
+        if bricks_to_push == 0:
+            ultrasonic_collision_protocol()
+
+        arb.set_message(("clear", None))
+    else:
+        current_ultrasonic_distance = 0
+
+    # if brick has fallen off the edge, decrement counter
+    if previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
+        bricks_to_push -= 1
+        previous_ultrasonic_distance = current_ultrasonic_distance = 0
+
+
+def detect_touch():
+    message = decode_message()
+    if message[0] == "touch":
+        touch_collision_protocol(message[1])
+        arb.set_message(("clear", None))
 
 
 if __name__ == "__main__":
@@ -306,28 +328,13 @@ if __name__ == "__main__":
     findLakesStart = time()
 
     while mission_ongoing():
+        # TODO: implement timeout for pushing bricks
         color_collision_protocol(detect_line())
         detect_lakes(detect_color(), lakes_to_find)
-        push_bricks()
         move_both(SPEED)
 
-        message = decode_message()
-        print(bricks_to_push)
-
-        if message[0] == "ultrasonic":
-            previous_ultrasonic_distance = current_ultrasonic_distance
-            current_ultrasonic_distance = message[1]
-            arb.set_message(("clear", None))
-        else:
-            current_ultrasonic_distance = 0
-
-        if previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
-            bricks_to_push -= 1
-            previous_ultrasonic_distance = current_ultrasonic_distance = 0
-
-        if message[0] == "touch":
-            touch_collision_protocol(message[1])
-            arb.set_message(("clear", None))
+        detect_ultrasonic()
+        detect_touch()
 
     both_wheels.off()
     arb.write_to_socket(sock_out, False)
