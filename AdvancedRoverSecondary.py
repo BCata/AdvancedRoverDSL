@@ -22,7 +22,6 @@ us_front = UltrasonicSensor(INPUT_2)
 us_front.mode = 'US-DIST-CM'
 
 
-
 def connect():
     port = 3
     sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
@@ -31,12 +30,15 @@ def connect():
     print('Connected to ', SERVER_MAC)
     return sock, sock.makefile('r'), sock.makefile('w')
 
+
 def disconnect(sock):
     sock.close() 
+
 
 def write_to_socket(sock_out, message):
     sock_out.write(str(message) + '\n')
     sock_out.flush()
+
 
 def run():
     sock, sock_in, sock_out = connect()
@@ -44,14 +46,15 @@ def run():
     listener = threading.Thread(target=listen, args=(sock_in, sock_out))
     listener.start()
 
-    while mission_ongoing: 
-        distance = ultrasonic_detection()
-        if distance:
-            write_to_socket(sock_out, ("ultrasonic",distance))
-        
+    while mission_ongoing:
         touch = touch_detection()
         if touch[0] or touch[1]:
             write_to_socket(sock_out, ("touch",touch))
+
+        distance = ultrasonic_detection()
+        if distance:
+            write_to_socket(sock_out, ("ultrasonic", distance))
+
 
     disconnect(sock_in)
     disconnect(sock_out)
@@ -59,21 +62,26 @@ def run():
     s.speak("completed")
     print("Slave disconnected")
 
+
 def ultrasonic_detection():
     if us_front.value()/10 < 15:
         return us_front.value()
 
+
 def touch_detection():
     return (ts_left.is_pressed,ts_right.is_pressed)
+
 
 def listen(sock_in, sock_out):
     global mission_ongoing
     mission_ongoing = eval(sock_in.readline())
-    
+
+
 def reset_gyro():
     gs.mode = 'GYRO-RATE'
     gs.mode = 'GYRO-ANG'
     print("Gyro reseted!")
+
 
 def gyro(sock_in, sock_out):
     while mission_ongoing:
