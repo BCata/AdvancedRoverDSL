@@ -36,3 +36,16 @@ def turn_right(percent, seconds, blocking=True):
     left_wheel.on_for_seconds(SpeedPercent(percent),
                               seconds, brake=False,
                               block=blocking)
+
+
+def move_both_in_direction(percent, direction, seconds=None):
+    if seconds:
+        if direction == "forward":
+            move_both_for_seconds(percent, seconds)
+        else:
+            move_both_for_seconds(-percent, seconds)
+    else:
+        if direction == "forward":
+            move_both(percent)
+        else:
+            move_both(-percent)

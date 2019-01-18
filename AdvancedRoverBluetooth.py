@@ -42,7 +42,7 @@ def listen(sock_in, sock_out, mission_ongoing):
 
     while mission_ongoing:
         # converting serialized string to tuple
-        # each tupple is formed of the sensor from which the
+        # each tuple is formed of the sensor from which the
         # information come and the value given by that sensor
         message = eval(sock_in.readline())
         # print("Bluetooth received: ", message)
