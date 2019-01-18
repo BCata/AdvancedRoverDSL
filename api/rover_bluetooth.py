@@ -45,5 +45,4 @@ def listen(sock_in, sock_out, mission_ongoing):
         # each tuple is formed of the sensor from which the
         # information come and the value given by that sensor
         message = eval(sock_in.readline())
-        # print("Bluetooth received: ", message)
 

@@ -7,7 +7,7 @@ from ev3dev2.sound import Sound
 
 import api.rover_bluetooth as arb
 
-from api.touch import detect_touch
+from api.touch import detect_touch, get_touch_encountered, set_touch_encountered
 from api.parking import park_rover
 from api.measurements import measure_lake
 from api.wheel_movement import move_both, stop_both
@@ -38,7 +38,7 @@ color_found = {
 }
 
 bricks_pushed = False
-bricks_to_push = 2
+bricks_to_push = 1
 
 s = Sound()
 cs_left = get_left_sensor()
@@ -98,18 +98,19 @@ def mission_ongoing():
     return True
 
 
-def push_bricks():
-    global bricks_to_push, bricks_pushed
+current_ultrasonic_distance = 0
+previous_ultrasonic_distance = 0
 
-    current_ultrasonic_distance = 0
-    previous_ultrasonic_distance = 0
+
+def push_bricks():
+    global bricks_to_push, bricks_pushed, previous_ultrasonic_distance, current_ultrasonic_distance
+
     has_time_elapsed = time() - globalStart >= PUSH_BRICKS_TIMEOUT
 
     # detect ultrasonic input from secondary brick
     message = arb.read_message()
 
     if message[0] == "ultrasonic":
-
         if bricks_to_push == 0 or has_time_elapsed:
             # done pushing bricks
             bricks_pushed = True
@@ -124,9 +125,12 @@ def push_bricks():
         current_ultrasonic_distance = 0
 
     # if brick has fallen off the edge, decrement counter
-    if bricks_to_push > 0 and previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
-        bricks_to_push -= 1
-        previous_ultrasonic_distance = current_ultrasonic_distance = 0
+    if get_touch_encountered():
+        set_touch_encountered(False)
+    else:
+        if bricks_to_push > 0 and previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
+            bricks_to_push -= 1
+            previous_ultrasonic_distance = current_ultrasonic_distance = 0
 
 
 if __name__ == "__main__":
@@ -149,10 +153,11 @@ if __name__ == "__main__":
 
     # mission completed (or timeout exceeded)
     stop_both()
-    arb.write_to_socket(sock_out, False)
-    s.speak("Mission")
+    s.speak("Exploration finished")
 
     s.speak("Now let me park")
     park_rover(BORDER_COLOR)
     stop_both()
-    s.speak("Bye bye")
+
+    s.speak("Mission")
+    arb.write_to_socket(sock_out, False)

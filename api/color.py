@@ -46,7 +46,7 @@ def get_middle_sensor():
 
 
 def get_right_sensor():
-    return  cs_right
+    return cs_right
 
 
 def color_collision_protocol(color_sensor_tuple):
@@ -64,7 +64,7 @@ def color_collision_protocol(color_sensor_tuple):
         turn_right(-30, TIME)
         turn_left(30, TIME)
     elif color_sensor_tuple[1]:
-        move_back(15, 2)
+        move_back(15, 1)
         if random.randint(1, 2) == 1:
             turn_left(-10, TIME)
             turn_right(10, TIME)
