@@ -1,4 +1,4 @@
-import AdvancedRoverBluetooth as arb
+import api.rover_bluetooth as arb
 from api.wheel_movement import stop_both, move_back, turn_right, turn_left
 
 
