@@ -8,12 +8,12 @@ from time import time
 from ev3dev2.led import Leds
 from ev3dev2.sound import Sound
 from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-from ev3dev2.motor import LargeMotor, MoveTank, OUTPUT_A, OUTPUT_B, OUTPUT_D, SpeedPercent
-from ev3dev2.motor import MediumMotor
 from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor
 
 import AdvancedRoverBluetooth as arb
 
+from api.wheel_movement import move_both_for_seconds, move_both, stop_both, move_back, turn_left, turn_right
+from api.arm_movement import lower_arm, raise_arm
 
 SPEED = 30
 TIME = 0.4
@@ -53,49 +53,8 @@ cs_middle = ColorSensor(INPUT_3)
 cs_right = ColorSensor(INPUT_4)
 us_back = UltrasonicSensor(INPUT_2)
 us_back.mode = 'US-DIST-CM'
-arm = MediumMotor(OUTPUT_B)
-left_wheel = LargeMotor(OUTPUT_A)
-right_wheel = LargeMotor(OUTPUT_D)
-both_wheels = MoveTank(OUTPUT_A, OUTPUT_D)
 
 color_sensors = [cs_left, cs_middle, cs_right]
-
-
-def move_both_for_seconds(percent, seconds, blocking=True):
-    both_wheels.on_for_seconds(SpeedPercent(percent),
-                                SpeedPercent(percent),
-                                seconds,
-                                brake=False,
-                                block=blocking)
-
-
-def move_both(percent):
-    both_wheels.on(SpeedPercent(percent),
-                                SpeedPercent(percent))
-
-
-def move_back(percent, seconds, blocking=True):
-    move_both_for_seconds(-percent, seconds, blocking=blocking)
-
-
-def turn_left(percent, seconds, blocking=True):
-    right_wheel.on_for_seconds(SpeedPercent(percent),
-                               seconds, brake=False,
-                               block=blocking)
-
-
-def turn_right(percent, seconds, blocking=True):
-    left_wheel.on_for_seconds(SpeedPercent(percent),
-                              seconds, brake=False,
-                              block=blocking)
-
-
-def lower_arm():
-    arm.on_for_degrees(SpeedPercent(-10), 90)
-
-
-def raise_arm():
-    arm.on_for_degrees(SpeedPercent(10), 90)
 
 
 def detect_line():
@@ -107,48 +66,48 @@ def detect_color():
 
 
 def collision_protocol2(color_sensor_tuple):
-    leds.set_color("LEFT", "RED") 
+    leds.set_color("LEFT", "RED")
     leds.set_color("RIGHT", "RED")
     if color_sensor_tuple[0]:
-        print("Angle: ", arb.angle) 
+        print("Angle: ", arb.angle)
         while abs(arb.angle) < 90:
-            print("Angle: ", arb.angle) 
+            print("Angle: ", arb.angle)
             turn_left(-SPEED, TIME)
-            turn_right(SPEED,TIME)
-        if(abs(arb.angle) >= 90):
-            print("Angle: ", arb.angle) 
-            both_wheels.off()
+            turn_right(SPEED, TIME)
+        if abs(arb.angle) >= 90 :
+            print("Angle: ", arb.angle)
+            stop_both()
             arb.write_to_socket(sock_out, "reset_gyro")
 
     elif color_sensor_tuple[2]:
-        print("Angle: ", arb.angle) 
+        print("Angle: ", arb.angle)
         while abs(arb.angle) < 90:
-            print("Angle: ", arb.angle) 
+            print("Angle: ", arb.angle)
             turn_right(-SPEED, TIME)
-            turn_left(SPEED,TIME)
-        if(abs(arb.angle) >= 90):
-            print("Angle: ", arb.angle) 
-            both_wheels.off()
+            turn_left(SPEED, TIME)
+        if abs(arb.angle) >= 90 :
+            print("Angle: ", arb.angle)
+            stop_both()
             arb.write_to_socket(sock_out, "reset_gyro")
 
     elif color_sensor_tuple[1]:
         move_back(20, 2)
 
-    leds.set_color("LEFT", "GREEN") 
+    leds.set_color("LEFT", "GREEN")
     leds.set_color("RIGHT", "GREEN")
 
 
 def color_collision_protocol(color_sensor_tuple):
-    leds.set_color("LEFT", "RED") 
+    leds.set_color("LEFT", "RED")
     leds.set_color("RIGHT", "RED")
 
     if color_sensor_tuple[0]:
-        both_wheels.off()
+        stop_both()
         move_back(15, TIME)
         turn_left(-30, TIME)
         turn_right(30, TIME)
     elif color_sensor_tuple[2]:
-        both_wheels.off()
+        stop_both()
         move_back(15, TIME)
         turn_right(-30, TIME)
         turn_left(30, TIME)
@@ -161,16 +120,16 @@ def color_collision_protocol(color_sensor_tuple):
             turn_right(-10, TIME)
             turn_left(10, TIME)
     if us_back.value()/10 >= 4:
-        both_wheels.off()
+        stop_both()
         sleep(0.4)
         move_both_for_seconds(30, TIME)
 
-    leds.set_color("LEFT", "GREEN") 
+    leds.set_color("LEFT", "GREEN")
     leds.set_color("RIGHT", "GREEN")
 
 
 def ultrasonic_collision_protocol():
-    both_wheels.off()
+    stop_both()
     leds.set_color("LEFT", "RED")
     leds.set_color("RIGHT", "RED")
 
@@ -187,7 +146,7 @@ def ultrasonic_collision_protocol():
 
 
 def touch_collision_protocol(touch_sensor_tuple):
-    both_wheels.off()
+    stop_both()
     move_back(15, TIME)
     if touch_sensor_tuple[0] :
         turn_left(-30, TIME)
@@ -253,7 +212,7 @@ def detect_lakes(color_sensor_tuple, lakes):
     for index, color in enumerate(color_sensor_tuple):
         if color in lakes:
             color_sensor_firing[index] = True
-            both_wheels.off()
+            stop_both()
             if color == RED and not color_found[RED] and not has_time_elapsed:
                 process_lake(RED, "Red")
             if color == YELLOW and not color_found[YELLOW] and not has_time_elapsed:
@@ -337,6 +296,6 @@ if __name__ == "__main__":
         detect_ultrasonic()
         detect_touch()
 
-    both_wheels.off()
+    stop_both()
     arb.write_to_socket(sock_out, False)
     s.speak("Mission")
