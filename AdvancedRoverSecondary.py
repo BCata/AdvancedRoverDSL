@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+import sys
 import bluetooth
 import threading
+
 from time import sleep
 from ev3dev2.sound import Sound
 from ev3dev2.sensor.lego import GyroSensor, TouchSensor, UltrasonicSensor
@@ -41,7 +43,18 @@ def write_to_socket(sock_out, message):
 
 
 def run():
-    sock, sock_in, sock_out = connect()
+    
+    for i in range(1,10):
+        try:
+            print("Attempt {attempt} out of 10".format(attempt=i))
+            sock, sock_in, sock_out = connect()
+        except bluetooth.btcommon.BluetoothError:
+            continue
+        except:
+            print(sys.exc_info()[0])
+        finally:
+            sleep(3)
+        break
 
     listener = threading.Thread(target=listen, args=(sock_in, sock_out))
     listener.start()
