@@ -3,7 +3,6 @@
 import threading
 import random
 
-import functools
 from time import sleep
 from time import time
 from ev3dev2.led import Leds
@@ -24,8 +23,9 @@ BLUE = ColorSensor.COLOR_BLUE
 YELLOW = ColorSensor.COLOR_YELLOW
 GREEN = ColorSensor.COLOR_GREEN
 
-FIND_LAKES_TIMEOUT = 200
 GLOBAL_TIMEOUT = 300
+FIND_LAKES_TIMEOUT = 200
+PUSH_BRICKS_TIMEOUT = 10
 
 # value = 0
 lakes_found = False
@@ -37,14 +37,14 @@ color_found = {
 
 measurements = {
     RED: (),
-    BLUE: ("temp","depth","sal"),
-    GREEN: ("temp","sal")
+    BLUE: ("temp", "depth", "sal"),
+    GREEN: ("temp", "sal")
 }
 
+bricks_pushed = False
 current_ultrasonic_distance = 0
 previous_ultrasonic_distance = 0
-bricks_to_push = 1
-pushing_bricks = True
+bricks_to_push = 2
 
 s = Sound()
 leds = Leds()
@@ -146,23 +146,23 @@ def color_collision_protocol(color_sensor_tuple):
         both_wheels.off()
         move_back(15, TIME)
         turn_left(-30, TIME)
-        turn_right(30,TIME)
+        turn_right(30, TIME)
     elif color_sensor_tuple[2]:
         both_wheels.off()
         move_back(15, TIME)
         turn_right(-30, TIME)
-        turn_left(30,TIME)
+        turn_left(30, TIME)
     elif color_sensor_tuple[1]:
         move_back(15, 2)
-        if random.randint(1,2) == 1:
+        if random.randint(1, 2) == 1:
             turn_left(-10, TIME)
-            turn_right(10,TIME)
+            turn_right(10, TIME)
         else:
             turn_right(-10, TIME)
-            turn_left(10,TIME)
+            turn_left(10, TIME)
     if us_back.value()/10 >= 4:
         both_wheels.off()
-        sleep(0.5)
+        sleep(0.4)
         move_both_for_seconds(30, TIME)
 
     leds.set_color("LEFT", "GREEN") 
@@ -170,24 +170,20 @@ def color_collision_protocol(color_sensor_tuple):
 
 
 def ultrasonic_collision_protocol():
-    if not pushing_bricks:
-        both_wheels.off()
-        leds.set_color("LEFT", "RED")
-        leds.set_color("RIGHT", "RED")
+    both_wheels.off()
+    leds.set_color("LEFT", "RED")
+    leds.set_color("RIGHT", "RED")
 
-        move_back(15, TIME)
-        if random.randint(1, 2) == 1:
-            turn_left(-30, TIME)
-            turn_right(30, TIME)
-        else:
-            turn_left(30, TIME)
-            turn_right(-30, TIME)
-
-        leds.set_color("LEFT", "GREEN")
-        leds.set_color("RIGHT", "GREEN")
-
+    move_back(15, TIME)
+    if random.randint(1, 2) == 1:
+        turn_left(-30, TIME)
+        turn_right(30, TIME)
     else:
-        pass
+        turn_left(30, TIME)
+        turn_right(-30, TIME)
+
+    leds.set_color("LEFT", "GREEN")
+    leds.set_color("RIGHT", "GREEN")
 
 
 def touch_collision_protocol(touch_sensor_tuple):
@@ -203,11 +199,11 @@ def touch_collision_protocol(touch_sensor_tuple):
 
 def generate_measurement_value(measurement):
     if measurement == "temp" :
-        return "temperature", str(round(random.uniform(-70,-50),3)), "degrees"
+        return "temperature", str(round(random.uniform(-70, -50), 3)), "degrees"
     elif measurement == "depth":
-        return "depth", str(round(random.uniform(5,842),3)), "meters"
+        return "depth", str(round(random.uniform(5, 842), 3)), "meters"
     elif measurement == "sal":
-        return "salinity", str(round(random.uniform(0.1, 35),3)), "per mille"
+        return "salinity", str(round(random.uniform(0.1, 35), 3)), "per mille"
 
 
 def position_rover_for_measurement(lake_color):
@@ -248,7 +244,7 @@ def process_lake(color_val, color_name):
 
 def detect_lakes(color_sensor_tuple, lakes):
     color_sensor_firing = [False, False, False]
-    has_time_elapsed = time() - findLakesStart >= FIND_LAKES_TIMEOUT
+    has_time_elapsed = time() - globalStart >= FIND_LAKES_TIMEOUT
 
     global lakes_found
     if has_time_elapsed:
@@ -277,7 +273,7 @@ def mission_ongoing():
         return False
 
     # if all missions completed
-    if lakes_found:
+    if lakes_found and bricks_pushed:
         return False
 
     return True
@@ -287,11 +283,39 @@ def decode_message():
     return arb.read_message()
 
 
-def push_bricks():
-    if current_ultrasonic_distance != 0:
-        # we detected something
-        ultrasonic_collision_protocol()
+def detect_ultrasonic():
+    global bricks_to_push, previous_ultrasonic_distance, current_ultrasonic_distance, bricks_pushed
+    has_time_elapsed = time() - globalStart >= PUSH_BRICKS_TIMEOUT
 
+    # detect ultrasonic input from secondary brick
+    message = decode_message()
+
+    if message[0] == "ultrasonic":
+
+        if bricks_to_push == 0 or has_time_elapsed:
+            # done pushing bricks
+            bricks_pushed = True
+            ultrasonic_collision_protocol()
+        else:
+            # prepare decrement number of bricks after brick falls
+            previous_ultrasonic_distance = current_ultrasonic_distance
+            current_ultrasonic_distance = message[1]
+
+        arb.set_message(("clear", None))
+    else:
+        current_ultrasonic_distance = 0
+
+    # if brick has fallen off the edge, decrement counter
+    if bricks_to_push > 0 and previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
+        bricks_to_push -= 1
+        previous_ultrasonic_distance = current_ultrasonic_distance = 0
+
+
+def detect_touch():
+    message = decode_message()
+    if message[0] == "touch":
+        touch_collision_protocol(message[1])
+        arb.set_message(("clear", None))
 
 
 if __name__ == "__main__":
@@ -303,31 +327,15 @@ if __name__ == "__main__":
 
     # start timers
     globalStart = time()
-    findLakesStart = time()
 
     while mission_ongoing():
+        # TODO: implement timeout for pushing bricks
         color_collision_protocol(detect_line())
         detect_lakes(detect_color(), lakes_to_find)
-        push_bricks()
         move_both(SPEED)
 
-        message = decode_message()
-        print(bricks_to_push)
-
-        if message[0] == "ultrasonic":
-            previous_ultrasonic_distance = current_ultrasonic_distance
-            current_ultrasonic_distance = message[1]
-            arb.set_message(("clear", None))
-        else:
-            current_ultrasonic_distance = 0
-
-        if previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
-            bricks_to_push -= 1
-            previous_ultrasonic_distance = current_ultrasonic_distance = 0
-
-        if message[0] == "touch":
-            touch_collision_protocol(message[1])
-            arb.set_message(("clear", None))
+        detect_ultrasonic()
+        detect_touch()
 
     both_wheels.off()
     arb.write_to_socket(sock_out, False)
