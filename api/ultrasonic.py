@@ -36,3 +36,7 @@ def ultrasonic_back_collision_protocol():
         stop_both()
         sleep(0.4)
         move_both_for_seconds(30, TIME)
+
+
+def get_ultrasonic_back_value():
+    return us_back.value()

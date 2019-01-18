@@ -33,6 +33,10 @@ def get_white():
     return ColorSensor.COLOR_WHITE
 
 
+def get_black():
+    return ColorSensor.COLOR_BLACK
+
+
 def get_left_sensor():
     return cs_left
 
