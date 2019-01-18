@@ -26,9 +26,9 @@ GREEN = get_green()
 YELLOW = get_yellow()
 BLACK = get_black()
 
-GLOBAL_TIMEOUT = 2
+GLOBAL_TIMEOUT = 300
 FIND_LAKES_TIMEOUT = 200
-PUSH_BRICKS_TIMEOUT = 10
+PUSH_BRICKS_TIMEOUT = 250
 
 # value = 0
 lakes_found = False
