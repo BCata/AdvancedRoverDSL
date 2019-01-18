@@ -3,26 +3,26 @@
 import threading
 import random
 
-from time import sleep
 from time import time
-from ev3dev2.led import Leds
 from ev3dev2.sound import Sound
-from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-from ev3dev2.motor import LargeMotor, MoveTank, OUTPUT_A, OUTPUT_B, OUTPUT_D, SpeedPercent
-from ev3dev2.motor import MediumMotor
-from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor
 
 import AdvancedRoverBluetooth as arb
 
+from api.wheel_movement import move_both, stop_both, move_back, turn_left, turn_right, move_both_for_seconds
+from api.ultrasonic import ultrasonic_collision_protocol, ultrasonic_back_collision_protocol, get_ultrasonic_back_value
+from api.color import color_collision_protocol, detect_color, detect_line
+from api.color import get_right_sensor, get_left_sensor, get_middle_sensor
+from api.color import get_red, get_blue, get_green, get_yellow, get_white, get_black
+from api.measurements import measure_lake
+from api.touch import detect_touch
 
 SPEED = 30
-TIME = 0.4
-BORDER_COLOR = ColorSensor.COLOR_WHITE
-RED = ColorSensor.COLOR_RED
-BLUE = ColorSensor.COLOR_BLUE
-YELLOW = ColorSensor.COLOR_YELLOW
-GREEN = ColorSensor.COLOR_GREEN
-BLACK = ColorSensor.COLOR_BLACK
+BORDER_COLOR = get_white()
+RED = get_red()
+BLUE = get_blue()
+GREEN = get_green()
+YELLOW = get_yellow()
+BLACK = get_black()
 
 GLOBAL_TIMEOUT = 2
 FIND_LAKES_TIMEOUT = 200
@@ -36,167 +36,15 @@ color_found = {
     GREEN: False
 }
 
-measurements = {
-    RED: (),
-    BLUE: ("temp", "depth", "sal"),
-    GREEN: ("temp", "sal")
-}
-
 bricks_pushed = False
 current_ultrasonic_distance = 0
 previous_ultrasonic_distance = 0
 bricks_to_push = 2
 
 s = Sound()
-leds = Leds()
-cs_left = ColorSensor(INPUT_1)
-cs_middle = ColorSensor(INPUT_3)
-cs_right = ColorSensor(INPUT_4)
-us_back = UltrasonicSensor(INPUT_2)
-us_back.mode = 'US-DIST-CM'
-arm = MediumMotor(OUTPUT_B)
-left_wheel = LargeMotor(OUTPUT_A)
-right_wheel = LargeMotor(OUTPUT_D)
-both_wheels = MoveTank(OUTPUT_A, OUTPUT_D)
-
-
-def move_both_for_seconds(percent, seconds, blocking=True):
-    both_wheels.on_for_seconds(SpeedPercent(percent),
-                                SpeedPercent(percent),
-                                seconds,
-                                brake=False,
-                                block=blocking)
-
-
-def move_both(percent):
-    both_wheels.on(SpeedPercent(percent),
-                                SpeedPercent(percent))
-
-
-def move_back(percent, seconds, blocking=True):
-    move_both_for_seconds(-percent, seconds, blocking=blocking)
-
-
-def turn_left(percent, seconds, blocking=True):
-    right_wheel.on_for_seconds(SpeedPercent(percent),
-                               seconds, brake=False,
-                               block=blocking)
-
-
-def turn_right(percent, seconds, blocking=True):
-    left_wheel.on_for_seconds(SpeedPercent(percent),
-                              seconds, brake=False,
-                              block=blocking)
-
-
-def lower_arm():
-    arm.on_for_degrees(SpeedPercent(-10), 90)
-
-
-def raise_arm():
-    arm.on_for_degrees(SpeedPercent(10), 90)
-
-
-def detect_line():
-    return cs_left.color == BORDER_COLOR, cs_middle.color == BORDER_COLOR, cs_right.color == BORDER_COLOR
-
-
-def detect_color():
-    return cs_left.color, cs_middle.color, cs_right.color
-
-
-def color_collision_protocol(color_sensor_tuple):
-    leds.set_color("LEFT", "RED") 
-    leds.set_color("RIGHT", "RED")
-
-    if color_sensor_tuple[0]:
-        both_wheels.off()
-        move_back(15, TIME)
-        turn_left(-30, TIME)
-        turn_right(30, TIME)
-    elif color_sensor_tuple[2]:
-        both_wheels.off()
-        move_back(15, TIME)
-        turn_right(-30, TIME)
-        turn_left(30, TIME)
-    elif color_sensor_tuple[1]:
-        move_back(15, 2)
-        if random.randint(1, 2) == 1:
-            turn_left(-10, TIME)
-            turn_right(10, TIME)
-        else:
-            turn_right(-10, TIME)
-            turn_left(10, TIME)
-    if us_back.value()/10 >= 4:
-        both_wheels.off()
-        sleep(0.4)
-        move_both_for_seconds(30, TIME)
-
-    leds.set_color("LEFT", "GREEN") 
-    leds.set_color("RIGHT", "GREEN")
-
-
-def ultrasonic_collision_protocol():
-    both_wheels.off()
-    leds.set_color("LEFT", "RED")
-    leds.set_color("RIGHT", "RED")
-
-    move_back(15, TIME)
-    if random.randint(1, 2) == 1:
-        turn_left(-30, TIME)
-        turn_right(30, TIME)
-    else:
-        turn_left(30, TIME)
-        turn_right(-30, TIME)
-
-    leds.set_color("LEFT", "GREEN")
-    leds.set_color("RIGHT", "GREEN")
-
-
-def touch_collision_protocol(touch_sensor_tuple):
-    both_wheels.off()
-    move_back(15, TIME)
-    if touch_sensor_tuple[0] :
-        turn_left(-30, TIME)
-        turn_right(30, TIME)
-    elif touch_sensor_tuple[1]:
-        turn_left(30, TIME)
-        turn_right(-30, TIME)
-
-
-def generate_measurement_value(measurement):
-    if measurement == "temp" :
-        return "temperature", str(round(random.uniform(-70, -50), 3)), "degrees"
-    elif measurement == "depth":
-        return "depth", str(round(random.uniform(5, 842), 3)), "meters"
-    elif measurement == "sal":
-        return "salinity", str(round(random.uniform(0.1, 35), 3)), "per mille"
-
-
-def position_rover_for_measurement(lake_color):
-    counter = 0
-
-    while cs_middle.color != lake_color or cs_left.color == lake_color or cs_right.color == lake_color:
-        if cs_left.color == lake_color:
-            turn_left(10, 0.4)
-            turn_right(-10, 0.4)
-        elif cs_right.color == lake_color:
-            turn_left(-10, 0.4)
-            turn_right(10, 0.4)
-        else:
-            if counter < 4:
-                move_both_for_seconds(10, 0.4)
-                counter += 1
-
-
-def measure_lake(color):
-    if len(measurements[color]) != 0:
-        position_rover_for_measurement(color)
-        lower_arm()
-        for measure in measurements[color]:
-            text = generate_measurement_value(measure)
-            # s.speak(text[0] + text[1] + text[2])
-        raise_arm()
+cs_left = get_left_sensor()
+cs_middle = get_middle_sensor()
+cs_right = get_right_sensor()
 
 
 def process_lake(color_val, color_name):
@@ -220,7 +68,7 @@ def detect_lakes(color_sensor_tuple, lakes):
     for index, color in enumerate(color_sensor_tuple):
         if color in lakes:
             color_sensor_firing[index] = True
-            both_wheels.off()
+            stop_both()
             if color == RED and not color_found[RED] and not has_time_elapsed:
                 process_lake(RED, "Red")
             if color == YELLOW and not color_found[YELLOW] and not has_time_elapsed:
@@ -231,6 +79,7 @@ def detect_lakes(color_sensor_tuple, lakes):
                 process_lake(GREEN, "Green")
 
     color_collision_protocol(color_sensor_firing)
+    ultrasonic_back_collision_protocol()
 
 
 def mission_ongoing():
@@ -246,16 +95,12 @@ def mission_ongoing():
     return True
 
 
-def decode_message():
-    return arb.read_message()
-
-
 def detect_ultrasonic():
     global bricks_to_push, previous_ultrasonic_distance, current_ultrasonic_distance, bricks_pushed
     has_time_elapsed = time() - globalStart >= PUSH_BRICKS_TIMEOUT
 
     # detect ultrasonic input from secondary brick
-    message = decode_message()
+    message = arb.read_message()
 
     if message[0] == "ultrasonic":
 
@@ -278,13 +123,6 @@ def detect_ultrasonic():
         previous_ultrasonic_distance = current_ultrasonic_distance = 0
 
 
-def detect_touch():
-    message = decode_message()
-    if message[0] == "touch":
-        touch_collision_protocol(message[1])
-        arb.set_message(("clear", None))
-
-
 def found_parking_spot(color_sensor_tuple):
     print("Left: ", color_sensor_tuple[0])
     print("Right: ", color_sensor_tuple[2])
@@ -293,7 +131,7 @@ def found_parking_spot(color_sensor_tuple):
 
 def position_on_border_line():
     last_sensor_fired = "left"
-    while not found_parking_spot(detect_line()):
+    while not found_parking_spot(detect_line(BORDER_COLOR)):
         if cs_left.color == BORDER_COLOR:
             turn_right(-5, 0.1)
             turn_left(5, 0.2)
@@ -316,13 +154,14 @@ def position_on_border_line():
 
 def on_the_border(color_sensor_tuple):
     return color_sensor_tuple[0] or color_sensor_tuple[1] or color_sensor_tuple[2] \
-           or us_back.value()/10 > 4
+           or get_ultrasonic_back_value()/10 > 4
 
 
 def move_to_border():
-    while not on_the_border(detect_line()):
+    while not on_the_border(detect_line(BORDER_COLOR)):
         move_both(15)
-        color_collision_protocol(detect_line())
+        color_collision_protocol(detect_line(BORDER_COLOR))
+        ultrasonic_back_collision_protocol()
         detect_ultrasonic()
         detect_touch()
 
@@ -359,8 +198,8 @@ def move_to_corner(direction="forward"):
         # detect_ultrasonic()
         # detect_touch()
         cs = detect_color()
-        if decode_message()[0] == "ultrasonic" \
-                or decode_message()[0] == "touch" \
+        if arb.read_message()[0] == "ultrasonic" \
+                or arb.read_message()[0] == "touch" \
                 or cs[0] != BLACK or cs[1] != BLACK or cs[2] != BLACK:
                     direction = toggle_direction(direction)
                     move_both_in_direction(15, direction, 1)
@@ -397,7 +236,8 @@ if __name__ == "__main__":
     globalStart = time()
 
     while mission_ongoing():
-        color_collision_protocol(detect_line())
+        color_collision_protocol(detect_line(BORDER_COLOR))
+        ultrasonic_back_collision_protocol()
         detect_lakes(detect_color(), lakes_to_find)
         move_both(SPEED)
 
@@ -405,11 +245,11 @@ if __name__ == "__main__":
         detect_touch()
 
     # mission completed (or timeout exceeded)
-    both_wheels.off()
+    stop_both()
     arb.write_to_socket(sock_out, False)
     s.speak("Mission")
 
     s.speak("Now let me park")
     park_rover()
-    both_wheels.off()
+    stop_both()
     s.speak("Bye bye")
