@@ -13,6 +13,38 @@ cs_middle = ColorSensor(INPUT_3)
 cs_right = ColorSensor(INPUT_4)
 
 
+def get_red():
+    return ColorSensor.COLOR_RED
+
+
+def get_blue():
+    return ColorSensor.COLOR_BLUE
+
+
+def get_green():
+    return ColorSensor.COLOR_GREEN
+
+
+def get_yellow():
+    return ColorSensor.COLOR_YELLOW
+
+
+def get_white():
+    return ColorSensor.COLOR_WHITE
+
+
+def get_left_sensor():
+    return cs_left
+
+
+def get_middle_sensor():
+    return cs_middle
+
+
+def get_right_sensor():
+    return  cs_right
+
+
 def color_collision_protocol(color_sensor_tuple):
     leds.set_color("LEFT", "RED")
     leds.set_color("RIGHT", "RED")

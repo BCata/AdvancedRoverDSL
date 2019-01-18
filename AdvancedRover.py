@@ -5,23 +5,23 @@ import random
 
 from time import time
 from ev3dev2.sound import Sound
-from ev3dev2._platform.ev3 import INPUT_1, INPUT_3, INPUT_4
-from ev3dev2.sensor.lego import ColorSensor
 
 import AdvancedRoverBluetooth as arb
 
-from api.wheel_movement import move_both_for_seconds, move_both, stop_both, move_back, turn_left, turn_right
+from api.wheel_movement import move_both, stop_both, move_back, turn_left, turn_right
 from api.ultrasonic import ultrasonic_collision_protocol, ultrasonic_back_collision_protocol
 from api.color import color_collision_protocol, detect_color, detect_line
-from api.arm_movement import lower_arm, raise_arm
-from api.touch import touch_collision_protocol
+from api.color import get_right_sensor, get_left_sensor, get_middle_sensor
+from api.color import get_red, get_blue, get_green, get_yellow, get_white
+from api.measurements import measure_lake
+from api.touch import detect_touch
 
 SPEED = 30
-BORDER_COLOR = ColorSensor.COLOR_WHITE
-RED = ColorSensor.COLOR_RED
-BLUE = ColorSensor.COLOR_BLUE
-YELLOW = ColorSensor.COLOR_YELLOW
-GREEN = ColorSensor.COLOR_GREEN
+BORDER_COLOR = get_white()
+RED = get_red()
+BLUE = get_blue()
+GREEN = get_green()
+YELLOW = get_yellow()
 
 GLOBAL_TIMEOUT = 2
 FIND_LAKES_TIMEOUT = 200
@@ -35,56 +35,15 @@ color_found = {
     GREEN: False
 }
 
-measurements = {
-    RED: (),
-    BLUE: ("temp", "depth", "sal"),
-    GREEN: ("temp", "sal")
-}
-
 bricks_pushed = False
 current_ultrasonic_distance = 0
 previous_ultrasonic_distance = 0
 bricks_to_push = 2
 
 s = Sound()
-cs_left = ColorSensor(INPUT_1)
-cs_middle = ColorSensor(INPUT_3)
-cs_right = ColorSensor(INPUT_4)
-
-
-def generate_measurement_value(measurement):
-    if measurement == "temp" :
-        return "temperature", str(round(random.uniform(-70, -50), 3)), "degrees"
-    elif measurement == "depth":
-        return "depth", str(round(random.uniform(5, 842), 3)), "meters"
-    elif measurement == "sal":
-        return "salinity", str(round(random.uniform(0.1, 35), 3)), "per mille"
-
-
-def position_rover_for_measurement(lake_color):
-    counter = 0
-
-    while cs_middle.color != lake_color or cs_left.color == lake_color or cs_right.color == lake_color:
-        if cs_left.color == lake_color:
-            turn_left(10, 0.4)
-            turn_right(-10, 0.4)
-        elif cs_right.color == lake_color:
-            turn_left(-10, 0.4)
-            turn_right(10, 0.4)
-        else:
-            if counter < 4:
-                move_both_for_seconds(10, 0.4)
-                counter += 1
-
-
-def measure_lake(color):
-    if len(measurements[color]) != 0:
-        position_rover_for_measurement(color)
-        lower_arm()
-        for measure in measurements[color]:
-            text = generate_measurement_value(measure)
-            # s.speak(text[0] + text[1] + text[2])
-        raise_arm()
+cs_left = get_left_sensor()
+cs_middle = get_middle_sensor()
+cs_right = get_right_sensor()
 
 
 def process_lake(color_val, color_name):
@@ -122,7 +81,6 @@ def detect_lakes(color_sensor_tuple, lakes):
     ultrasonic_back_collision_protocol()
 
 
-
 def mission_ongoing():
 
     # global timeout exceeded
@@ -136,16 +94,12 @@ def mission_ongoing():
     return True
 
 
-def decode_message():
-    return arb.read_message()
-
-
 def detect_ultrasonic():
     global bricks_to_push, previous_ultrasonic_distance, current_ultrasonic_distance, bricks_pushed
     has_time_elapsed = time() - globalStart >= PUSH_BRICKS_TIMEOUT
 
     # detect ultrasonic input from secondary brick
-    message = decode_message()
+    message = arb.read_message()
 
     if message[0] == "ultrasonic":
 
@@ -166,13 +120,6 @@ def detect_ultrasonic():
     if bricks_to_push > 0 and previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
         bricks_to_push -= 1
         previous_ultrasonic_distance = current_ultrasonic_distance = 0
-
-
-def detect_touch():
-    message = decode_message()
-    if message[0] == "touch":
-        touch_collision_protocol(message[1])
-        arb.set_message(("clear", None))
 
 
 def found_parking_spot(color_sensor_tuple):
