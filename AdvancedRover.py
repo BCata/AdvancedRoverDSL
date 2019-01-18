@@ -23,7 +23,7 @@ BLUE = ColorSensor.COLOR_BLUE
 YELLOW = ColorSensor.COLOR_YELLOW
 GREEN = ColorSensor.COLOR_GREEN
 
-GLOBAL_TIMEOUT = 300
+GLOBAL_TIMEOUT = 2
 FIND_LAKES_TIMEOUT = 200
 PUSH_BRICKS_TIMEOUT = 10
 
@@ -57,8 +57,6 @@ arm = MediumMotor(OUTPUT_B)
 left_wheel = LargeMotor(OUTPUT_A)
 right_wheel = LargeMotor(OUTPUT_D)
 both_wheels = MoveTank(OUTPUT_A, OUTPUT_D)
-
-color_sensors = [cs_left, cs_middle, cs_right]
 
 
 def move_both_for_seconds(percent, seconds, blocking=True):
@@ -104,38 +102,6 @@ def detect_line():
 
 def detect_color():
     return cs_left.color, cs_middle.color, cs_right.color
-
-
-def collision_protocol2(color_sensor_tuple):
-    leds.set_color("LEFT", "RED") 
-    leds.set_color("RIGHT", "RED")
-    if color_sensor_tuple[0]:
-        print("Angle: ", arb.angle) 
-        while abs(arb.angle) < 90:
-            print("Angle: ", arb.angle) 
-            turn_left(-SPEED, TIME)
-            turn_right(SPEED,TIME)
-        if(abs(arb.angle) >= 90):
-            print("Angle: ", arb.angle) 
-            both_wheels.off()
-            arb.write_to_socket(sock_out, "reset_gyro")
-
-    elif color_sensor_tuple[2]:
-        print("Angle: ", arb.angle) 
-        while abs(arb.angle) < 90:
-            print("Angle: ", arb.angle) 
-            turn_right(-SPEED, TIME)
-            turn_left(SPEED,TIME)
-        if(abs(arb.angle) >= 90):
-            print("Angle: ", arb.angle) 
-            both_wheels.off()
-            arb.write_to_socket(sock_out, "reset_gyro")
-
-    elif color_sensor_tuple[1]:
-        move_back(20, 2)
-
-    leds.set_color("LEFT", "GREEN") 
-    leds.set_color("RIGHT", "GREEN")
 
 
 def color_collision_protocol(color_sensor_tuple):
@@ -318,6 +284,56 @@ def detect_touch():
         arb.set_message(("clear", None))
 
 
+def found_parking_spot(color_sensor_tuple):
+    print("Left: ", color_sensor_tuple[0])
+    print("Right: ", color_sensor_tuple[2])
+    return color_sensor_tuple[0] and color_sensor_tuple[2]
+
+
+def position_on_border_line():
+    while not found_parking_spot(detect_line()):
+        if cs_left.color == BORDER_COLOR:
+            # if random.randint(1, 2) == 1:
+            turn_right(-5, 0.1)
+            # else:
+            turn_left(5, 0.2)
+        elif cs_right.color == BORDER_COLOR:
+            # if random.randint(1, 2) == 1:
+            turn_left(-5, 0.1)
+            # else:
+            turn_right(5, 0.2)
+        elif cs_middle.color == BORDER_COLOR:
+            move_back(10, 1)
+            if random.randint(1, 2) == 1:
+                turn_left(-10, 0.3)
+                turn_right(10, 0.3)
+            else:
+                turn_right(-10, 0.3)
+                turn_left(10, 0.3)
+        else:
+            move_both(15)
+
+
+def on_the_border(color_sensor_tuple):
+    return color_sensor_tuple[0] or color_sensor_tuple[1] or color_sensor_tuple[2]
+
+
+def move_to_border():
+    while not on_the_border(detect_line()):
+        move_both(SPEED)
+        color_collision_protocol(detect_line())
+        detect_ultrasonic()
+        detect_touch()
+
+
+def turn_90_degrees():
+    pass
+
+
+def move_to_corner():
+    pass
+
+
 if __name__ == "__main__":
     sock, sock_in, sock_out = arb.connect()
     listener = threading.Thread(target=arb.listen, args=(sock_in, sock_out, mission_ongoing))
@@ -329,13 +345,20 @@ if __name__ == "__main__":
     globalStart = time()
 
     while mission_ongoing():
-        # TODO: implement timeout for pushing bricks
         color_collision_protocol(detect_line())
         detect_lakes(detect_color(), lakes_to_find)
         move_both(SPEED)
 
         detect_ultrasonic()
         detect_touch()
+
+    # mission completed (or timeout exceeded)
+    
+    # park rover
+    move_to_border()
+    position_on_border_line()
+    turn_90_degrees()
+    move_to_corner()
 
     both_wheels.off()
     arb.write_to_socket(sock_out, False)
