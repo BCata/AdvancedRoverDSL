@@ -85,11 +85,11 @@ def toggle_direction(direction):
         return "forward"
 
 
-def move_to_corner(direction="forward"):
-    while not on_the_border(detect_line()):
+def move_to_corner(border_color,direction="forward"):
+    while not on_the_border(detect_line(border_color)):
         move_both_in_direction(15, direction)
         # color_collision_protocol(detect_line())
-        # push_bricks()
+        # push_b    ricks()
         # detect_touch()
         cs = detect_color()
         if arb.read_message()[0] == "ultrasonic" \
@@ -103,4 +103,4 @@ def park_rover(border_color):
     move_to_border(border_color)
     position_on_border_line(border_color)
     turn_90_degrees()
-    move_to_corner()
+    move_to_corner(border_color)
