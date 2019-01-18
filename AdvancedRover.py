@@ -5,19 +5,18 @@ import random
 
 from time import time
 from ev3dev2.sound import Sound
-from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
-from ev3dev2.sensor.lego import ColorSensor, UltrasonicSensor
+from ev3dev2._platform.ev3 import INPUT_1, INPUT_3, INPUT_4
+from ev3dev2.sensor.lego import ColorSensor
 
 import AdvancedRoverBluetooth as arb
 
 from api.wheel_movement import move_both_for_seconds, move_both, stop_both, move_back, turn_left, turn_right
 from api.ultrasonic import ultrasonic_collision_protocol, ultrasonic_back_collision_protocol
+from api.color import color_collision_protocol, detect_color, detect_line
 from api.arm_movement import lower_arm, raise_arm
 from api.touch import touch_collision_protocol
-from api.color import color_collision_protocol
 
 SPEED = 30
-TIME = 0.4
 BORDER_COLOR = ColorSensor.COLOR_WHITE
 RED = ColorSensor.COLOR_RED
 BLUE = ColorSensor.COLOR_BLUE
@@ -51,14 +50,6 @@ s = Sound()
 cs_left = ColorSensor(INPUT_1)
 cs_middle = ColorSensor(INPUT_3)
 cs_right = ColorSensor(INPUT_4)
-
-
-def detect_line():
-    return cs_left.color == BORDER_COLOR, cs_middle.color == BORDER_COLOR, cs_right.color == BORDER_COLOR
-
-
-def detect_color():
-    return cs_left.color, cs_middle.color, cs_right.color
 
 
 def generate_measurement_value(measurement):
@@ -191,7 +182,7 @@ def found_parking_spot(color_sensor_tuple):
 
 
 def position_on_border_line():
-    while not found_parking_spot(detect_line()):
+    while not found_parking_spot(detect_line(BORDER_COLOR)):
         if cs_left.color == BORDER_COLOR:
             # if random.randint(1, 2) == 1:
             turn_right(-5, 0.1)
@@ -219,9 +210,9 @@ def on_the_border(color_sensor_tuple):
 
 
 def move_to_border():
-    while not on_the_border(detect_line()):
+    while not on_the_border(detect_line(BORDER_COLOR)):
         move_both(SPEED)
-        color_collision_protocol(detect_line())
+        color_collision_protocol(detect_line(BORDER_COLOR))
         ultrasonic_back_collision_protocol()
         detect_ultrasonic()
         detect_touch()
@@ -246,7 +237,7 @@ if __name__ == "__main__":
     globalStart = time()
 
     while mission_ongoing():
-        color_collision_protocol(detect_line())
+        color_collision_protocol(detect_line(BORDER_COLOR))
         ultrasonic_back_collision_protocol()
         detect_lakes(detect_color(), lakes_to_find)
         move_both(SPEED)
