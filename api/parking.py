@@ -1,5 +1,6 @@
 import random
-import AdvancedRoverBluetooth as arb
+
+import api.rover_bluetooth as arb
 
 from api.color import get_black
 from api.touch import detect_touch

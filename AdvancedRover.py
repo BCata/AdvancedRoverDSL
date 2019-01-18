@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 
 import threading
-import random
 
 from time import time
 from ev3dev2.sound import Sound
 
-import AdvancedRoverBluetooth as arb
+import api.rover_bluetooth as arb
 
 from api.touch import detect_touch
 from api.parking import park_rover
@@ -15,7 +14,7 @@ from api.wheel_movement import move_both, stop_both
 from api.color import color_collision_protocol, detect_color, detect_line
 from api.color import get_right_sensor, get_left_sensor, get_middle_sensor
 from api.color import get_red, get_blue, get_green, get_yellow, get_white, get_black
-from api.ultrasonic import ultrasonic_collision_protocol, ultrasonic_back_collision_protocol, get_ultrasonic_back_value
+from api.ultrasonic import ultrasonic_collision_protocol, ultrasonic_back_collision_protocol
 
 SPEED = 30
 
