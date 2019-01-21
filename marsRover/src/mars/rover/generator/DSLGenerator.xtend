@@ -7,6 +7,7 @@ import org.eclipse.emf.ecore.resource.Resource
 import org.eclipse.xtext.generator.AbstractGenerator
 import org.eclipse.xtext.generator.IFileSystemAccess2
 import org.eclipse.xtext.generator.IGeneratorContext
+import mars.rover.dSL.Mission
 
 /**
  * Generates code from your model files on save.
@@ -16,10 +17,26 @@ import org.eclipse.xtext.generator.IGeneratorContext
 class DSLGenerator extends AbstractGenerator {
 
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
-//		fsa.generateFile('greetings.txt', 'People to greet: ' + 
-//			resource.allContents
-//				.filter(Greeting)
-//				.map[name]
-//				.join(', '))
+		val root = resource.allContents.head as Mission;
+		if (root !== null) {
+			var mainPath = "generated/" + resource.getURI().lastSegment + '/'
+			fsa.generateFile(mainPath + 'AdvancedRover.py', CodeGenerator.toMainCode(root))
+			
+			var secondaryPath = "generated/" + resource.getURI().lastSegment + '/'
+			fsa.generateFile(secondaryPath + 'AdvancedRoverSecondary.py', CodeGenerator.toSecondaryCode(root))
+			
+			var apiPath = "generated/api" + resource.getURI().lastSegment + '/'
+			fsa.generateFile(apiPath + 'arm_movement.py', CodeGenerator.toAPI_armMovement())
+			fsa.generateFile(apiPath + 'celebration.py', CodeGenerator.toAPI_celebration())
+			fsa.generateFile(apiPath + 'color.py', CodeGenerator.toAPI_color())
+			fsa.generateFile(apiPath + 'measurements.py', CodeGenerator.toAPI_measurements())
+			fsa.generateFile(apiPath + 'mission_report.py', CodeGenerator.toAPI_missionReport())
+			fsa.generateFile(apiPath + 'parking.py', CodeGenerator.toAPI_parking())
+			fsa.generateFile(apiPath + 'rover_bluetooth.py', CodeGenerator.toAPI_roverBluetooth())
+			fsa.generateFile(apiPath + 'touch.py', CodeGenerator.toAPI_touch())
+			fsa.generateFile(apiPath + 'ultrasonic.py', CodeGenerator.toAPI_ultrasonic())
+			fsa.generateFile(apiPath + 'wheel_movement.py', CodeGenerator.toAPI_wheelMovement())
+			
+		}
 	}
 }
