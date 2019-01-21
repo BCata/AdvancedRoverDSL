@@ -1,0 +1,33 @@
+MissionName: Exploration
+MasterMAC: "00:17:E9:B2:1E:41"
+BorderColor: white
+GroundColor: black 
+Timeout: 300 sec
+CreateReport
+
+Tasks:
+    Task: FindLakes
+    Timeout: 100 sec    
+        Lake:
+            Color: blue
+            MeasureFeatures:
+                Feature: temperature
+                Feature: depth
+                Feature: salinity
+
+        Lake:
+            Color: red
+            
+        Lake:
+        	Color: green
+        	MeasureFeatures:
+        		Feature: salinity
+        		Feature: temperature
+
+    Task: PushBricks
+         Timeout: 100 sec
+         Amount: 2
+         
+    Task: Celebrate with sing
+
+    Task: ParkRover
