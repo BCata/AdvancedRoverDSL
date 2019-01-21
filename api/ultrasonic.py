@@ -1,11 +1,14 @@
 import random
 
+import api.rover_bluetooth as arb
+
 from time import sleep
 from ev3dev2.led import Leds
 from ev3dev2._platform.ev3 import INPUT_2
 from ev3dev2.sensor.lego import UltrasonicSensor
 from api.wheel_movement import stop_both, move_back, turn_right, turn_left
 from api.wheel_movement import move_both_for_seconds
+
 
 leds = Leds()
 TIME = 0.4
@@ -36,6 +39,13 @@ def ultrasonic_back_collision_protocol():
         stop_both()
         sleep(0.4)
         move_both_for_seconds(30, TIME)
+
+
+def detect_ultrasonic_front():
+    if arb.read_message()[0] == "ultrasonic":
+        # print("Received ultrasonic")
+        ultrasonic_collision_protocol()
+        arb.set_message(("clear", None))
 
 
 def get_ultrasonic_back_value():
