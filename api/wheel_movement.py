@@ -5,9 +5,9 @@ right_wheel = LargeMotor(OUTPUT_D)
 both_wheels = MoveTank(OUTPUT_A, OUTPUT_D)
 
 
-def move_both_for_seconds(percent, seconds, blocking=True):
-    both_wheels.on_for_seconds(SpeedPercent(percent),
-                               SpeedPercent(percent),
+def move_both_for_seconds(percent_left, seconds, blocking=True, percent_right=None):
+    both_wheels.on_for_seconds(SpeedPercent(percent_left),
+                               SpeedPercent(percent_right if percent_right else percent_left),
                                seconds,
                                brake=False,
                                block=blocking)

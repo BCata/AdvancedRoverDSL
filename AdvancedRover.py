@@ -6,11 +6,12 @@ from time import time
 from ev3dev2.sound import Sound
 
 import api.rover_bluetooth as arb
+from api.celebration import celebrate
 
 from api.touch import detect_touch, get_touch_encountered, set_touch_encountered
 from api.parking import park_rover
 from api.measurements import measure_lake
-from api.wheel_movement import move_both, stop_both
+from api.wheel_movement import move_both, stop_both, move_both_for_seconds
 from api.color import color_collision_protocol, detect_color, detect_line
 from api.color import get_right_sensor, get_left_sensor, get_middle_sensor
 from api.color import get_red, get_blue, get_green, get_yellow, get_white, get_black
@@ -44,10 +45,6 @@ s = Sound()
 cs_left = get_left_sensor()
 cs_middle = get_middle_sensor()
 cs_right = get_right_sensor()
-
-
-def celebrate():
-    pass
 
 
 def process_lake(color_val, color_name):
@@ -133,6 +130,10 @@ def push_bricks():
             previous_ultrasonic_distance = current_ultrasonic_distance = 0
 
 
+def generate_mission_report():
+    pass
+
+
 if __name__ == "__main__":
     sock, sock_in, sock_out = arb.connect()
     listener = threading.Thread(target=arb.listen, args=(sock_in, sock_out, mission_ongoing))
@@ -155,9 +156,14 @@ if __name__ == "__main__":
     stop_both()
     s.speak("Exploration finished")
 
+    s.speak("Let's celebrate")
+    celebrate("spin")
+
     s.speak("Now let me park")
     park_rover(BORDER_COLOR)
     stop_both()
+
+    generate_mission_report()
 
     s.speak("Mission")
     arb.write_to_socket(sock_out, False)
