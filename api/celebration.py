@@ -3,48 +3,10 @@ from ev3dev2.sound import Sound
 
 s = Sound()
 
-mario_celebration_tone = [(660, 100, 150),
-                            (660, 100, 300),
-                            (660, 100, 300),
-                            (510, 100, 100),
-                            (660, 100, 300),
-                            (770, 100, 550),
-                            (380, 100, 575),
 
-                            (500, 60, 150),
-                            (500, 80, 300),
-                            (500, 60, 350),
-                            (500, 80, 150),
-                            (580, 80, 350),
-                            (660, 80, 150),
-                            (500, 80, 300),
-                            (430, 80, 150),
-                            (380, 80, 600),
-
-                            (500, 60, 150),
-                            (500, 80, 300),
-                            (500, 60, 350),
-                            (500, 80, 150),
-                            (580, 80, 150),
-                            (660, 80, 550),
-
-                            (870, 80, 325),
-                            (760, 80, 600),
-
-                            (500, 60, 150),
-                            (500, 80, 300),
-                            (500, 60, 350),
-                            (500, 80, 150),
-                            (580, 80, 350),
-                            (660, 80, 150),
-                            (500, 80, 300),
-
-                            (430, 80, 150),
-                            (380, 80, 600)]
-
-
-def celebrate(celebration="sound"):
-    if celebrate == "sound":
-        s.tone(mario_celebration_tone)
+def celebrate(celebration="sing"):
+    if celebration == "sing":
+        s.play('resources/celebration_song.wav')
     elif celebration == "spin":
+        print("spin")
         move_both_for_seconds(30, 2.3, True, -30)
