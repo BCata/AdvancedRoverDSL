@@ -28,7 +28,7 @@ GREEN = get_green()
 YELLOW = get_yellow()
 BLACK = get_black()
 
-GLOBAL_TIMEOUT = 10
+GLOBAL_TIMEOUT = 300
 FIND_LAKES_TIMEOUT = 200
 PUSH_BRICKS_TIMEOUT = 1
 
@@ -114,14 +114,17 @@ def push_bricks():
 
     has_time_elapsed = time() - globalStart >= PUSH_BRICKS_TIMEOUT
 
+    if bricks_to_push == 0 or has_time_elapsed:
+        # done pushing bricks
+        bricks_pushed = True
+        push_bricks_duration = floor(time() - globalStart)
+
     # detect ultrasonic input from secondary brick
     message = arb.read_message()
 
     if message[0] == "ultrasonic":
         if bricks_to_push == 0 or has_time_elapsed:
             # done pushing bricks
-            bricks_pushed = True
-            push_bricks_duration = floor(time() - globalStart)
             ultrasonic_collision_protocol()
         else:
             # prepare decrement number of bricks after brick falls
