@@ -13,6 +13,23 @@ cs_middle = ColorSensor(INPUT_3)
 cs_right = ColorSensor(INPUT_4)
 
 
+def color_to_text(color):
+    if color == get_red():
+        return "RED"
+    elif color == get_blue():
+        return "BLUE"
+    elif color == get_green():
+        return "GREEN"
+    elif color == get_yellow():
+        return "YELLOW"
+    elif color == get_white():
+        return "WHITE"
+    elif color == get_black():
+        return "BLACK"
+
+    return "TRANSPARENT"
+
+
 def get_red():
     return ColorSensor.COLOR_RED
 

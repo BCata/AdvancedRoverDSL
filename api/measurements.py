@@ -2,7 +2,7 @@ import random
 
 from api.arm_movement import lower_arm, raise_arm
 from api.wheel_movement import turn_right, turn_left, move_both_for_seconds
-from api.color import get_left_sensor, get_middle_sensor, get_right_sensor
+from api.color import get_left_sensor, get_middle_sensor, get_right_sensor, color_to_text
 from api.color import get_red, get_blue, get_green, get_yellow, get_white
 
 RED = get_red()
@@ -22,8 +22,24 @@ cs_middle = get_middle_sensor()
 cs_right = get_right_sensor()
 
 
+lake_measurements = {
+    "RED": {},
+    "BLUE": {},
+    "GREEN": {}
+}
+
+
+def set_measurement(color, measurement):
+    global lake_measurements
+    lake_measurements[color][measurement[0]] = measurement[1] + " " + measurement[2]
+
+
+def get_measurements():
+    return lake_measurements
+
+
 def generate_measurement_value(measurement):
-    if measurement == "temp" :
+    if measurement == "temp":
         return "temperature", str(round(random.uniform(-70, -50), 3)), "degrees"
     elif measurement == "depth":
         return "depth", str(round(random.uniform(5, 842), 3)), "meters"
@@ -53,5 +69,6 @@ def measure_lake(color):
         lower_arm()
         for measure in measurements[color]:
             text = generate_measurement_value(measure)
+            set_measurement(color_to_text(color), text)
             # s.speak(text[0] + text[1] + text[2])
         raise_arm()

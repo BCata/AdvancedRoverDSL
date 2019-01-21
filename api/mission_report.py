@@ -8,21 +8,30 @@ def task_finish_cause(timeout, elapsed_time):
 
 
 def report_header(timeout, elapsed_time):
+    print("Entered report_header")
     report = '''
     Mission {0} finished in {1} seconds with {2}
     '''.format(mission_name,
                elapsed_time,
                task_finish_cause(timeout, elapsed_time))
 
+    print("Exiting report_header")
     return report
 
 
 def lakes_mission_report(timeout, elapsed_time, measurements):
+    print("Entered lakes_mission_report")
     measurements_report = ""
     for lake_color in measurements:
         measurements_report += '''
             {0}:
         '''.format(lake_color)
+
+        if not measurements[lake_color]:
+            # if there are no measurements for this lake
+            measurements_report += '''
+                No measurements performed
+            '''
 
         for lake_measurements in measurements[lake_color]:
             measurements_report += '''
@@ -36,25 +45,29 @@ def lakes_mission_report(timeout, elapsed_time, measurements):
             {0}
         '''.format(measurements_report)
 
+    print("Exiting lakes_mission_report")
     return report
 
 
-def bricks_mission_report(timeout, elapsed_time, measurements):
+def bricks_mission_report(timeout, elapsed_time, bricks_pushed):
+    print("Entered bricks_mission_report")
     report = '''
         Push bricks finished in {0} seconds with {1}:
     '''.format(elapsed_time,
                task_finish_cause(timeout, elapsed_time)) + '''
             Bricks pushed off Mars: {0}
-        '''.format(measurements["bricks_pushed"])
+        '''.format(bricks_pushed)
 
+    print("Exiting bricks_mission_report")
     return report
 
 
 def celebration_report(celebration_type):
+    print("Entered celebration_report")
     report = '''
         Celebrated with {0}
     '''.format(celebration_type)
-
+    print("Exiting celebration_report")
     return report
 
 
@@ -76,12 +89,11 @@ def generate_mission_report(timeouts, measurements):
     #                                           },
     #                                    red:...
     #                              },
-    #                       bricks: {
-    #                                    bricks_pushed: 3
-    #                                }
+    #                       bricks_pushed: 3 out of 5,
+    #                       celebrate: "sing"
 
-    f = open("resources/mission_report.txt", "w")
-
+    f = open("mission_report.txt", "w")
+    print("File opened")
     mission_report = \
         report_header(timeouts["global_timeout"],
                       timeouts["global_time_elapsed"]) + \
@@ -90,7 +102,10 @@ def generate_mission_report(timeouts, measurements):
                              measurements['lakes']) + \
         bricks_mission_report(timeouts["push_bricks_timeout"],
                               timeouts["push_bricks_elapsed_time"],
-                              measurements['bricks']) + \
+                              measurements['bricks_pushed']) + \
         celebration_report(measurements['celebrate'])
 
+    print("Before write")
     f.write(mission_report)
+    print("After write")
+
