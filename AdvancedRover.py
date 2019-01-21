@@ -7,6 +7,7 @@ from ev3dev2.sound import Sound
 
 import api.rover_bluetooth as arb
 from api.celebration import celebrate
+from api.mission_report import generate_mission_report
 
 from api.touch import detect_touch, get_touch_encountered, set_touch_encountered
 from api.parking import park_rover
@@ -83,13 +84,16 @@ def detect_lakes(color_sensor_tuple, lakes):
 
 
 def mission_ongoing():
+    global mission_duration
 
     # global timeout exceeded
     if time() - globalStart >= GLOBAL_TIMEOUT:
+        mission_duration = time() - globalStart
         return False
 
     # if all missions completed
     if lakes_found and bricks_pushed:
+        mission_duration = time() - globalStart
         return False
 
     return True
@@ -130,8 +134,18 @@ def push_bricks():
             previous_ultrasonic_distance = current_ultrasonic_distance = 0
 
 
-def generate_mission_report():
-    pass
+def create_mission_report():
+    timeouts = {'global_timeout': GLOBAL_TIMEOUT,
+                'global_time_elapseed': mission_duration,
+                'find_lakes_timeout': FIND_LAKES_TIMEOUT,
+                'find_lakes_elapsed_time': None,
+                'push_bricks_timeout': PUSH_BRICKS_TIMEOUT,
+                'push_bricks_elapsed_time': None
+                }
+
+    measurements = {}
+
+    generate_mission_report(timeouts, measurements)
 
 
 if __name__ == "__main__":
@@ -140,6 +154,8 @@ if __name__ == "__main__":
     listener.start()
 
     lakes_to_find = (RED, GREEN, BLUE)
+
+    mission_duration = -1
 
     # start timers
     globalStart = time()
@@ -156,14 +172,15 @@ if __name__ == "__main__":
     stop_both()
     s.speak("Exploration finished")
 
-    s.speak("Let's celebrate")
-    celebrate("spin")
+    # s.speak("Let us celebrate")
+    # celebrate("sing")
+    #
+    # s.speak("Now let me park")
+    # park_rover(BORDER_COLOR)
+    # stop_both()
 
-    s.speak("Now let me park")
-    park_rover(BORDER_COLOR)
-    stop_both()
-
-    generate_mission_report()
+    create_mission_report()
+    s.speak("Mission report generated")
 
     s.speak("Mission")
     arb.write_to_socket(sock_out, False)
