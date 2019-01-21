@@ -19,13 +19,13 @@ class DSLGenerator extends AbstractGenerator {
 	override void doGenerate(Resource resource, IFileSystemAccess2 fsa, IGeneratorContext context) {
 		val root = resource.allContents.head as Mission;
 		if (root !== null) {
-			var mainPath = "generated/" + resource.getURI().lastSegment + '/'
+			var mainPath = "generated/" + '/'
 			fsa.generateFile(mainPath + 'AdvancedRover.py', CodeGenerator.toMainCode(root))
 			
-			var secondaryPath = "generated/" + resource.getURI().lastSegment + '/'
+			var secondaryPath = "generated/" + '/'
 			fsa.generateFile(secondaryPath + 'AdvancedRoverSecondary.py', CodeGenerator.toSecondaryCode(root))
 			
-			var apiPath = "generated/api" + resource.getURI().lastSegment + '/'
+			var apiPath = "generated/api" + '/'
 			fsa.generateFile(apiPath + 'arm_movement.py', CodeGenerator.toAPI_armMovement())
 			fsa.generateFile(apiPath + 'celebration.py', CodeGenerator.toAPI_celebration())
 			fsa.generateFile(apiPath + 'color.py', CodeGenerator.toAPI_color())

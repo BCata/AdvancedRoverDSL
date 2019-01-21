@@ -1,12 +1,207 @@
 package mars.rover.generator
 
 import mars.rover.dSL.Mission
+import mars.rover.dSL.FindLakes
+import mars.rover.dSL.PushBricks
+import mars.rover.dSL.ParkRover
+import mars.rover.dSL.Celebrate
+import mars.rover.dSL.Task
+import mars.rover.dSL.Color
 
 class CodeGenerator {
 	def static toMainCode(Mission root) '''
+	#!/usr/bin/env python3
+	import sys
+	import threading
+	from math import floor
+	
+	from time import time
+	from ev3dev2.sound import Sound
+	
+	import api.rover_bluetooth as arb
+	from api.celebration import celebrate
+	from api.mission_report import generate_mission_report
+	
+	from api.touch import detect_touch, get_touch_encountered, set_touch_encountered
+	from api.parking import park_rover
+	from api.measurements import measure_lake, get_measurements
+	from api.wheel_movement import move_both, stop_both, move_both_for_seconds
+	from api.color import color_collision_protocol, detect_color, detect_line
+	from api.color import get_right_sensor, get_left_sensor, get_middle_sensor
+	from api.color import get_red, get_blue, get_green, get_yellow, get_white, get_black
+	from api.ultrasonic import ultrasonic_collision_protocol, ultrasonic_back_collision_protocol
+	
+	BORDER_COLOR = get_«root.borderColor»()
+	«root.groundColor.toString().toUpperCase()» = get_«root.groundColor»()
+	«FOR task: root.tasks»	
+		«generateColors(task.name)»
+	«ENDFOR»
+	
+	GLOBAL_TIMEOUT = «root.duration.dl»
+	
+	«FOR task: root.tasks»
+		«generateTimeout(task.name)»
+	«ENDFOR»
+	
+	s = Sound()
+	cs_left = get_left_sensor()
+	cs_middle = get_middle_sensor()
+	cs_right = get_right_sensor()
+	
+	«FOR task: root.tasks»
+		«generateActions(task.name)»
+	«ENDFOR»
+	
+	«IF root.createReport !== null»
+		«generateReportCode()»
+	«ENDIF»
 	'''
 	
+	def static generateReportCode() '''
+	def create_mission_report():
+	    timeouts = {'global_timeout': GLOBAL_TIMEOUT,
+	                'global_time_elapsed': mission_duration,
+	                'find_lakes_timeout': FIND_LAKES_TIMEOUT,
+	                'find_lakes_elapsed_time': min(find_lakes_duration, mission_duration),
+	                'push_bricks_timeout': PUSH_BRICKS_TIMEOUT,
+	                'push_bricks_elapsed_time': min(push_bricks_duration, mission_duration)
+	                }
+	
+	    measurements = {'lakes': get_measurements(),
+	                    'bricks_pushed': "{0} out of {1}".format(initial_number_of_bricks - bricks_to_push,
+	                                                             initial_number_of_bricks),
+	                    'celebrate': 'sing'
+	                    }
+	
+	    generate_mission_report(timeouts, measurements)
+	'''
+	
+	def static dispatch generateActions(FindLakes find) ''''''
+	def static dispatch generateActions(PushBricks push) ''''''
+	def static dispatch generateActions(ParkRover park) ''''''
+	def static dispatch generateActions(Celebrate celebrate) ''''''
+	
+	def static dispatch generateColors(FindLakes find)'''
+		«FOR lake: find.lakes»
+			«lake.color.toString().toUpperCase()» = get_«lake.color»()
+		«ENDFOR»
+		
+		color_found = {
+		«FOR lake: find.lakes SEPARATOR ","»	«lake.color.toString().toUpperCase()» = False
+		«ENDFOR»
+		}
+	'''
+	def static dispatch generateColors(PushBricks push)''''''
+	def static dispatch generateColors(ParkRover park)''''''
+	def static dispatch generateColors(Celebrate celebrate)''''''
+	
+	def static dispatch generateTimeout(FindLakes find)'''
+	FIND_LAKES_TIMEOUT = «find.duration.dl»
+	lakes_found = False
+	
+	'''
+	def static dispatch generateTimeout(PushBricks push)'''
+	PUSH_BRICKS_TIMEOUT = «push.duration.dl»
+	initial_number_of_bircks = «push.number»
+	bricks_pushed = False
+	bricks_to_push = initial_number_of_bricks
+	
+	'''
+	def static dispatch generateTimeout(ParkRover park)''''''
+	def static dispatch generateTimeout(Celebrate celebrate)''''''
+	
 	def static toSecondaryCode(Mission root) '''
+	#!/usr/bin/env python3
+	
+	import sys
+	import bluetooth
+	import threading
+	
+	from time import sleep
+	from ev3dev2.sound import Sound
+	from ev3dev2.sensor.lego import TouchSensor, UltrasonicSensor
+	from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
+	
+	
+	SERVER_MAC = «IF root.masterMAC !== null»'«root.masterMAC»'«ELSE»'00:17:E9:B2:1E:41'«ENDIF»
+	
+	mission_ongoing = True
+	
+	s = Sound()
+	gs = GyroSensor(INPUT_3)
+	gs.mode = 'GYRO-ANG'
+	ts_left = TouchSensor(INPUT_1)
+	ts_right = TouchSensor(INPUT_4)
+	us_front = UltrasonicSensor(INPUT_2)
+	us_front.mode = 'US-DIST-CM'
+	
+	
+	def connect():
+	    port = 3
+	    sock = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+	    print('Connecting...')
+	    sock.connect((SERVER_MAC, port)) 
+	    print('Connected to ', SERVER_MAC)
+	    return sock, sock.makefile('r'), sock.makefile('w')
+	
+	
+	def disconnect(sock):
+	    sock.close() 
+	
+	
+	def write_to_socket(sock_out, message):
+	    sock_out.write(str(message) + '\n')
+	    sock_out.flush()
+	
+	
+	def run():
+	    
+	    for i in range(1,10):
+	        try:
+	            print("Attempt {attempt} out of 10".format(attempt=i))
+	            sock, sock_in, sock_out = connect()
+	        except bluetooth.btcommon.BluetoothError:
+	            continue
+	        except:
+	            print(sys.exc_info()[0])
+	        finally:
+	            sleep(3)
+	        break
+	
+	    listener = threading.Thread(target=listen, args=(sock_in, sock_out))
+	    listener.start()
+	
+	    while mission_ongoing:
+	        touch = touch_detection()
+	        if touch[0] or touch[1]:
+	            write_to_socket(sock_out, ("touch",touch))
+	
+	        distance = ultrasonic_detection()
+	        if distance:
+	            write_to_socket(sock_out, ("ultrasonic", distance))
+	
+	
+	    disconnect(sock_in)
+	    disconnect(sock_out)
+	    disconnect(sock)    
+	    s.speak("completed")
+	    print("Slave disconnected")
+	
+	
+	def ultrasonic_detection():
+	    if us_front.value()/10 < 15:
+	        return us_front.value()
+	
+	
+	def touch_detection():
+	    return (ts_left.is_pressed,ts_right.is_pressed)
+	
+	
+	def listen(sock_in, sock_out):
+	    global mission_ongoing
+	    mission_ongoing = eval(sock_in.readline())
+	
+	run()
 	'''
 	
 	def static toAPI_armMovement()'''
@@ -21,7 +216,9 @@ class CodeGenerator {
 	
 	def raise_arm():
 	    arm.on_for_degrees(SpeedPercent(10), 100)
+	
 	'''
+	
 	def static toAPI_celebration()'''
 	from api.wheel_movement import move_both_for_seconds
 	from ev3dev2.sound import Sound
@@ -35,7 +232,9 @@ class CodeGenerator {
 	    elif celebration == "spin":
 	        print("spin")
 	        move_both_for_seconds(30, 2.3, True, -30)
+	
 	'''
+	
 	def static toAPI_color()'''
 	import random
 	
@@ -123,6 +322,7 @@ class CodeGenerator {
 	    return cs_left.color == border_color, cs_middle.color == border_color, cs_right.color == border_color
 	
 	'''
+
 	def static toAPI_measurements()'''
 	import random
 	
@@ -183,6 +383,7 @@ class CodeGenerator {
 	        raise_arm()
 	
 	'''
+
 	def static toAPI_missionReport()'''
 	mission_name = "Exploration"
 	
@@ -261,6 +462,7 @@ class CodeGenerator {
 	    f.write(mission_report)
 	
 	'''
+
 	def static toAPI_parking()'''
 	import random
 	
@@ -377,9 +579,8 @@ class CodeGenerator {
 	    move_to_corner(border_color)
 	
 	'''
+
 	def static toAPI_roverBluetooth()'''
-	#!/usr/bin/env python3
-	
 	import bluetooth
 	
 	# SERVER_MAC = 'CC:78:AB:50:B2:46' # brick 11
@@ -426,8 +627,8 @@ class CodeGenerator {
 	        # information come and the value given by that sensor
 	        message = eval(sock_in.readline())
 	
-	
 	'''
+
 	def static toAPI_touch()'''
 	import api.rover_bluetooth as arb
 	from api.wheel_movement import stop_both, move_back, turn_right, turn_left
@@ -468,6 +669,7 @@ class CodeGenerator {
 	        arb.set_message(("clear", None))
 	
 	'''
+
 	def static toAPI_ultrasonic()'''
 	import random
 	
@@ -523,6 +725,7 @@ class CodeGenerator {
 	    return us_back.value()
 	
 	'''
+
 	def static toAPI_wheelMovement()'''
 	from ev3dev2.motor import LargeMotor, MoveTank, OUTPUT_A, OUTPUT_D, SpeedPercent
 	
