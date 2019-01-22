@@ -52,6 +52,8 @@ class CodeGenerator {
 		«generateFunctions(task.name)»
 	«ENDFOR»
 	
+	«generateMissionOngoing(root)»
+	
 	«IF root.createReport !== null»
 		«generateReportCode()»
 	«ENDIF»
@@ -97,8 +99,13 @@ class CodeGenerator {
 	    s.speak("Mission")
 	    arb.write_to_socket(sock_out, False)
 	'''
+		
+	def static dispatch generateMissionOngoingConditions(FindLakes find) ''' and lakes_found'''
+	def static dispatch generateMissionOngoingConditions(PushBricks push) ''' and bricks_pushed'''	
+	def static dispatch generateMissionOngoingConditions(ParkRover park) ''''''
+	def static dispatch generateMissionOngoingConditions(Celebrate celebrate) ''''''
 	
-	def static generateMissionOngoing()'''
+	def static generateMissionOngoing(Mission root)'''
 	def mission_ongoing():
 	    global mission_duration
 	
@@ -108,7 +115,7 @@ class CodeGenerator {
 	        return False
 	
 	    # if all missions completed
-	    if lakes_found and bricks_pushed:
+	    if True«FOR t: root.tasks»«generateMissionOngoingConditions(t.name)»«ENDFOR»:  		
 	        mission_duration = floor(time() - globalStart)
 	        return False
 	
@@ -236,6 +243,7 @@ class CodeGenerator {
 	bricks_to_push = initial_number_of_bricks
 	current_ultrasonic_distance = 0
 	previous_ultrasonic_distance = 0
+	
 	'''
 	def static dispatch generateTimeout(ParkRover park)''''''
 	def static dispatch generateTimeout(Celebrate celebrate)''''''
