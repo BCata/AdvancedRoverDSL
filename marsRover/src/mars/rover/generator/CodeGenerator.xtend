@@ -7,6 +7,7 @@ import mars.rover.dSL.ParkRover
 import mars.rover.dSL.Celebrate
 import mars.rover.dSL.Task
 import mars.rover.dSL.Color
+import mars.rover.dSL.Name
 
 class CodeGenerator {
 	def static toMainCode(Mission root) '''
@@ -31,41 +32,41 @@ class CodeGenerator {
 	from api.color import get_red, get_blue, get_green, get_yellow, get_white, get_black
 	from api.ultrasonic import ultrasonic_collision_protocol, ultrasonic_back_collision_protocol
 	
-	BORDER_COLOR = get_Â«root.borderColorÂ»()
-	Â«root.groundColor.toString().toUpperCase()Â» = get_Â«root.groundColorÂ»()
-	Â«FOR task: root.tasksÂ»	
-		Â«generateColors(task.name)Â»
-	Â«ENDFORÂ»
+	BORDER_COLOR = get_«root.borderColor»()
+	«root.groundColor.toString().toUpperCase()» = get_«root.groundColor»()
+	«FOR task: root.tasks»	
+		«generateColors(task.name)»
+	«ENDFOR»
 	
-	GLOBAL_TIMEOUT = Â«root.duration.dlÂ»
+	GLOBAL_TIMEOUT = «root.duration.dl»
 	
-	Â«FOR task: root.tasksÂ»
-		Â«generateTimeout(task.name)Â»
-	Â«ENDFORÂ»
+	«FOR task: root.tasks»
+		«generateTimeout(task.name)»
+	«ENDFOR»
 	
 	s = Sound()
 	cs_left = get_left_sensor()
 	cs_middle = get_middle_sensor()
 	cs_right = get_right_sensor()
 	
-	Â«FOR task: root.tasksÂ»
-		Â«generateFunctions(task.name)Â»
-	Â«ENDFORÂ»
+	«FOR task: root.tasks»
+		«generateFunctions(task.name)»
+	«ENDFOR»
 	
-	Â«generateMissionOngoing(root)Â»
+	«IF root.createReport !== null»
+		«generateReportCode(root)»
+	«ENDIF»
 	
-	Â«IF root.createReport !== nullÂ»
-		Â«generateReportCode()Â»
-	Â«ENDIFÂ»
+	«generateMain(root)»
 	'''
 	
-	def static generateMain()'''
+	def static generateMain(Mission root)'''
 	if __name__ == "__main__":
 	    sock, sock_in, sock_out = arb.connect()
 	    listener = threading.Thread(target=arb.listen, args=(sock_in, sock_out, mission_ongoing))
 	    listener.start()
 	
-	    lakes_to_find = (RED, GREEN, BLUE)
+	    lakes_to_find = «FOR task: root.tasks BEFORE "(" AFTER ")"»«IF task.name instanceof FindLakes»«val findLakes = task.name as FindLakes»«FOR lake: findLakes.lakes SEPARATOR ", "»«lake.color.toString().toUpperCase()»«ENDFOR»«ENDIF»«ENDFOR»
 	
 	    mission_duration = sys.maxsize
 	    find_lakes_duration = sys.maxsize
@@ -79,33 +80,41 @@ class CodeGenerator {
 	        ultrasonic_back_collision_protocol()
 	        detect_lakes(detect_color(), lakes_to_find)
 	        move_both(SPEED)
-	        push_bricks()
+	        «var pushBricksExists = false»«FOR task: root.tasks»«IF task.name instanceof PushBricks»«{pushBricksExists=true;""}»«ENDIF»«ENDFOR»
+	        «IF pushBricksExists»push_bricks()«ELSE»
+	        message = arb.read_message()
+	        if message[0] == "ultrasonic":
+	        	ultrasonic_collision_protocol()
+	        	arb.set_message(("clear", None))
+	        «ENDIF»
+	        
 	        detect_touch()
 	
 	    # mission completed (or timeout exceeded)
 	    stop_both()
 	    s.speak("Exploration finished")
 	
+	    «FOR task: root.tasks»«IF task.name instanceof Celebrate»«val celebrate = task.name as Celebrate»
 	    s.speak("Let us celebrate")
-	    celebrate("sing")
+	    celebrate("«celebrate.celebrate»")
+	    «ENDIF»«ENDFOR»
 	
-	    s.speak("Now let me park")
-	    park_rover(BORDER_COLOR)
-	    stop_both()
-	
-	    create_mission_report()
-	    s.speak("Mission report generated")
+		«FOR task: root.tasks»«IF task.name instanceof ParkRover»
+		s.speak("Now let me park")
+		park_rover(BORDER_COLOR)
+		stop_both()
+	    «ENDIF»«ENDFOR»
+	    
+		«IF root.createReport !== null»
+		create_mission_report()
+		s.speak("Mission report generated")
+	    «ENDIF»
 	
 	    s.speak("Mission")
 	    arb.write_to_socket(sock_out, False)
 	'''
-		
-	def static dispatch generateMissionOngoingConditions(FindLakes find) ''' and lakes_found'''
-	def static dispatch generateMissionOngoingConditions(PushBricks push) ''' and bricks_pushed'''	
-	def static dispatch generateMissionOngoingConditions(ParkRover park) ''''''
-	def static dispatch generateMissionOngoingConditions(Celebrate celebrate) ''''''
 	
-	def static generateMissionOngoing(Mission root)'''
+	def static generateMissionOngoing()'''
 	def mission_ongoing():
 	    global mission_duration
 	
@@ -115,32 +124,54 @@ class CodeGenerator {
 	        return False
 	
 	    # if all missions completed
-	    if TrueÂ«FOR t: root.tasksÂ»Â«generateMissionOngoingConditions(t.name)Â»Â«ENDFORÂ»:  		
+	    if lakes_found and bricks_pushed:
 	        mission_duration = floor(time() - globalStart)
 	        return False
 	
 	    return True
 	'''
 	
-	def static generateReportCode() '''
+	def static generateReportCode(Mission root) '''
 	def create_mission_report():
 	    timeouts = {'global_timeout': GLOBAL_TIMEOUT,
 	                'global_time_elapsed': mission_duration,
-	                'find_lakes_timeout': FIND_LAKES_TIMEOUT,
-	                'find_lakes_elapsed_time': min(find_lakes_duration, mission_duration),
-	                'push_bricks_timeout': PUSH_BRICKS_TIMEOUT,
-	                'push_bricks_elapsed_time': min(push_bricks_duration, mission_duration)
+	                «FOR task: root.tasks SEPARATOR ","»
+	                	«generateReportTimeouts(task.name)»
+	                «ENDFOR»
 	                }
 	
-	    measurements = {'lakes': get_measurements(),
-	                    'bricks_pushed': "{0} out of {1}".format(initial_number_of_bricks - bricks_to_push,
-	                                                             initial_number_of_bricks),
-	                    'celebrate': 'sing'
+	    measurements = {
+	    				«FOR task: root.tasks SEPARATOR ","»
+	    					«generateReportMeasurements(task.name)»
+		                «ENDFOR»
 	                    }
 	
 	    generate_mission_report(timeouts, measurements)
 	
 	'''
+	
+	def static dispatch generateReportMeasurements(FindLakes mission) '''
+						'lakes': get_measurements()
+	'''
+	def static dispatch generateReportMeasurements(PushBricks mission) '''
+						'bricks_pushed': "{0} out of {1}".format(initial_number_of_bricks - bricks_to_push,
+							                                     initial_number_of_bricks)
+	'''
+	def static dispatch generateReportMeasurements(ParkRover mission) ''''''
+	def static dispatch generateReportMeasurements(Celebrate mission) '''
+						'celebrate': '«mission.celebrate»'
+	'''
+	
+	def static dispatch generateReportTimeouts(FindLakes task) '''
+				'find_lakes_timeout': FIND_LAKES_TIMEOUT,
+				'find_lakes_elapsed_time': min(find_lakes_duration, mission_duration)
+	'''
+	def static dispatch generateReportTimeouts(PushBricks task) '''
+				'push_bricks_timeout': PUSH_BRICKS_TIMEOUT,
+				'push_bricks_elapsed_time': min(push_bricks_duration, mission_duration)
+	'''
+	def static dispatch generateReportTimeouts(ParkRover task) ''''''
+	def static dispatch generateReportTimeouts(Celebrate task) ''''''
 	
 	def static dispatch generateFunctions(FindLakes find) '''
 	def process_lake(color_val, color_name):
@@ -184,47 +215,50 @@ class CodeGenerator {
 	def static dispatch generateFunctions(PushBricks push) '''
 	def push_bricks():
 	    global bricks_to_push, bricks_pushed, previous_ultrasonic_distance, current_ultrasonic_distance, push_bricks_duration
-	
-	    has_time_elapsed = time() - globalStart >= PUSH_BRICKS_TIMEOUT
-	
-	    # detect ultrasonic input from secondary brick
-	    message = arb.read_message()
-	
-	    if message[0] == "ultrasonic":
+	    
+	        has_time_elapsed = time() - globalStart >= PUSH_BRICKS_TIMEOUT
+	    
 	        if bricks_to_push == 0 or has_time_elapsed:
 	            # done pushing bricks
 	            bricks_pushed = True
 	            push_bricks_duration = floor(time() - globalStart)
-	            ultrasonic_collision_protocol()
+	    
+	        # detect ultrasonic input from secondary brick
+	        message = arb.read_message()
+	    
+	        if message[0] == "ultrasonic":
+	            if bricks_to_push == 0 or has_time_elapsed:
+	                # done pushing bricks
+	                ultrasonic_collision_protocol()
+	            else:
+	                # prepare decrement number of bricks after brick falls
+	                previous_ultrasonic_distance = current_ultrasonic_distance
+	                current_ultrasonic_distance = message[1]
+	    
+	            arb.set_message(("clear", None))
 	        else:
-	            # prepare decrement number of bricks after brick falls
-	            previous_ultrasonic_distance = current_ultrasonic_distance
-	            current_ultrasonic_distance = message[1]
-	
-	        arb.set_message(("clear", None))
-	    else:
-	        current_ultrasonic_distance = 0
-	
-	    # if brick has fallen off the edge, decrement counter
-	    if get_touch_encountered():
-	        set_touch_encountered(False)
-	    else:
-	        if bricks_to_push > 0 and previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
-	            bricks_to_push -= 1
-	            previous_ultrasonic_distance = current_ultrasonic_distance = 0
+	            current_ultrasonic_distance = 0
+	    
+	        # if brick has fallen off the edge, decrement counter
+	        if get_touch_encountered():
+	            set_touch_encountered(False)
+	        else:
+	            if bricks_to_push > 0 and previous_ultrasonic_distance != 0 and current_ultrasonic_distance == 0:
+	                bricks_to_push -= 1
+	                previous_ultrasonic_distance = current_ultrasonic_distance = 0
 	
 	'''
 	def static dispatch generateFunctions(ParkRover park) ''''''
 	def static dispatch generateFunctions(Celebrate celebrate) ''''''
 	
 	def static dispatch generateColors(FindLakes find)'''
-		Â«FOR lake: find.lakesÂ»
-			Â«lake.color.toString().toUpperCase()Â» = get_Â«lake.colorÂ»()
-		Â«ENDFORÂ»
+		«FOR lake: find.lakes»
+			«lake.color.toString().toUpperCase()» = get_«lake.color»()
+		«ENDFOR»
 		
 		color_found = {
-		Â«FOR lake: find.lakes SEPARATOR ","Â»	Â«lake.color.toString().toUpperCase()Â» = False
-		Â«ENDFORÂ»
+		«FOR lake: find.lakes SEPARATOR ","»	«lake.color.toString().toUpperCase()» = False
+		«ENDFOR»
 		}
 	'''
 	def static dispatch generateColors(PushBricks push)''''''
@@ -232,18 +266,17 @@ class CodeGenerator {
 	def static dispatch generateColors(Celebrate celebrate)''''''
 	
 	def static dispatch generateTimeout(FindLakes find)'''
-	FIND_LAKES_TIMEOUT = Â«find.duration.dlÂ»
+	FIND_LAKES_TIMEOUT = «IF find.untilTermination !== null»sys.maxsize«ELSE»«find.duration.dl»«ENDIF»
 	lakes_found = False
 	
 	'''
 	def static dispatch generateTimeout(PushBricks push)'''
-	PUSH_BRICKS_TIMEOUT = Â«push.duration.dlÂ»
-	initial_number_of_bircks = Â«push.numberÂ»
+	PUSH_BRICKS_TIMEOUT = «IF push.untilTermination !== null»sys.maxsize«ELSE»«push.duration.dl»«ENDIF»
+	initial_number_of_bricks = «push.number»
 	bricks_pushed = False
 	bricks_to_push = initial_number_of_bricks
 	current_ultrasonic_distance = 0
 	previous_ultrasonic_distance = 0
-	
 	'''
 	def static dispatch generateTimeout(ParkRover park)''''''
 	def static dispatch generateTimeout(Celebrate celebrate)''''''
@@ -261,7 +294,7 @@ class CodeGenerator {
 	from ev3dev2._platform.ev3 import INPUT_1, INPUT_2, INPUT_3, INPUT_4
 	
 	
-	SERVER_MAC = Â«IF root.masterMAC !== nullÂ»'Â«root.masterMACÂ»'Â«ELSEÂ»'00:17:E9:B2:1E:41'Â«ENDIFÂ»
+	SERVER_MAC = «IF root.masterMAC !== null»'«root.masterMAC»'«ELSE»'00:17:E9:B2:1E:41'«ENDIF»
 	
 	mission_ongoing = True
 	
