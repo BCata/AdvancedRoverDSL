@@ -55,49 +55,65 @@ class CodeGenerator {
 	«generateMissionOngoing(root)»
 	
 	«IF root.createReport !== null»
-		«generateReportCode()»
+		«generateReportCode(root)»
 	«ENDIF»
+	
+	 «generateMain(root)»
+	 
 	'''
 	
-	def static generateMain()'''
+	def static generateMain(Mission root)'''
 	if __name__ == "__main__":
-	    sock, sock_in, sock_out = arb.connect()
-	    listener = threading.Thread(target=arb.listen, args=(sock_in, sock_out, mission_ongoing))
-	    listener.start()
-	
-	    lakes_to_find = (RED, GREEN, BLUE)
-	
-	    mission_duration = sys.maxsize
-	    find_lakes_duration = sys.maxsize
-	    push_bricks_duration = sys.maxsize
-	
-	    # start timers
-	    globalStart = time()
-	
-	    while mission_ongoing():
-	        color_collision_protocol(detect_line(BORDER_COLOR))
-	        ultrasonic_back_collision_protocol()
-	        detect_lakes(detect_color(), lakes_to_find)
-	        move_both(SPEED)
-	        push_bricks()
-	        detect_touch()
-	
-	    # mission completed (or timeout exceeded)
-	    stop_both()
-	    s.speak("Exploration finished")
-	
-	    s.speak("Let us celebrate")
-	    celebrate("sing")
-	
-	    s.speak("Now let me park")
-	    park_rover(BORDER_COLOR)
-	    stop_both()
-	
-	    create_mission_report()
-	    s.speak("Mission report generated")
-	
-	    s.speak("Mission")
-	    arb.write_to_socket(sock_out, False)
+		sock, sock_in, sock_out = arb.connect()
+		listener = threading.Thread(target=arb.listen, args=(sock_in, sock_out, mission_ongoing))
+		listener.start()
+		
+		lakes_to_find = «FOR task: root.tasks BEFORE "(" AFTER ")"»«IF task.name instanceof FindLakes»«val findLakes = task.name as FindLakes»«FOR lake: findLakes.lakes SEPARATOR ", "»«lake.color.toString().toUpperCase()»«ENDFOR»«ENDIF»«ENDFOR»
+		
+		mission_duration = sys.maxsize
+		find_lakes_duration = sys.maxsize
+		push_bricks_duration = sys.maxsize
+		
+		# start timers
+		globalStart = time()
+		
+		while mission_ongoing():
+			color_collision_protocol(detect_line(BORDER_COLOR))
+			ultrasonic_back_collision_protocol()
+			detect_lakes(detect_color(), lakes_to_find)
+			move_both(SPEED)
+            «var pushBricksExists = false»«FOR task: root.tasks»«IF task.name instanceof PushBricks»«{pushBricksExists=true;""}»«ENDIF»«ENDFOR»
+            «IF pushBricksExists»push_bricks()«ELSE»
+            message = arb.read_message()
+            if message[0] == "ultrasonic":
+                ultrasonic_collision_protocol()
+                arb.set_message(("clear", None))
+            «ENDIF»
+			
+			detect_touch()
+			
+		# mission completed (or timeout exceeded)
+		stop_both()
+		s.speak("Exploration finished")
+		
+        «FOR task: root.tasks»«IF task.name instanceof Celebrate»«val celebrate = task.name as Celebrate»
+        s.speak("Let us celebrate")
+        celebrate("«celebrate.celebrate»")
+        «ENDIF»«ENDFOR»
+
+        «FOR task: root.tasks»«IF task.name instanceof ParkRover»
+        s.speak("Now let me park")
+		park_rover(BORDER_COLOR)
+		stop_both()
+        «ENDIF»«ENDFOR»
+		
+        «IF root.createReport !== null»
+		create_mission_report()
+		s.speak("Mission report generated")
+        «ENDIF»
+
+		s.speak("Mission")
+		arb.write_to_socket(sock_out, False)
 	'''
 		
 	def static dispatch generateMissionOngoingConditions(FindLakes find) ''' and lakes_found'''
@@ -122,25 +138,47 @@ class CodeGenerator {
 	    return True
 	'''
 	
-	def static generateReportCode() '''
+	def static generateReportCode(Mission root) '''
 	def create_mission_report():
-	    timeouts = {'global_timeout': GLOBAL_TIMEOUT,
-	                'global_time_elapsed': mission_duration,
-	                'find_lakes_timeout': FIND_LAKES_TIMEOUT,
-	                'find_lakes_elapsed_time': min(find_lakes_duration, mission_duration),
-	                'push_bricks_timeout': PUSH_BRICKS_TIMEOUT,
-	                'push_bricks_elapsed_time': min(push_bricks_duration, mission_duration)
-	                }
-	
-	    measurements = {'lakes': get_measurements(),
-	                    'bricks_pushed': "{0} out of {1}".format(initial_number_of_bricks - bricks_to_push,
-	                                                             initial_number_of_bricks),
-	                    'celebrate': 'sing'
+	        timeouts = {'global_timeout': GLOBAL_TIMEOUT,
+	                    'global_time_elapsed': mission_duration,
+	                    «FOR task: root.tasks SEPARATOR ","»
+	                        «generateReportTimeouts(task.name)»
+	                    «ENDFOR»
 	                    }
-	
-	    generate_mission_report(timeouts, measurements)
-	
+	   
+	        measurements = {
+	                        «FOR task: root.tasks SEPARATOR ","»
+	                            «generateReportMeasurements(task.name)»
+	                        «ENDFOR»
+	                        }
+	   
+	        generate_mission_report(timeouts, measurements)
+	    
 	'''
+	
+	def static dispatch generateReportMeasurements(FindLakes mission) '''
+                        'lakes': get_measurements()
+    '''
+    def static dispatch generateReportMeasurements(PushBricks mission) '''
+                        'bricks_pushed': "{0} out of {1}".format(initial_number_of_bricks - bricks_to_push,
+                                                                 initial_number_of_bricks)
+    '''
+    def static dispatch generateReportMeasurements(ParkRover mission) ''''''
+    def static dispatch generateReportMeasurements(Celebrate mission) '''
+                        'celebrate': '«mission.celebrate»'
+    '''
+   
+    def static dispatch generateReportTimeouts(FindLakes task) '''
+                'find_lakes_timeout': FIND_LAKES_TIMEOUT,
+                'find_lakes_elapsed_time': min(find_lakes_duration, mission_duration)
+    '''
+    def static dispatch generateReportTimeouts(PushBricks task) '''
+                'push_bricks_timeout': PUSH_BRICKS_TIMEOUT,
+                'push_bricks_elapsed_time': min(push_bricks_duration, mission_duration)
+    '''
+    def static dispatch generateReportTimeouts(ParkRover task) ''''''
+    def static dispatch generateReportTimeouts(Celebrate task) ''''''
 	
 	def static dispatch generateFunctions(FindLakes find) '''
 	def process_lake(color_val, color_name):
@@ -232,12 +270,12 @@ class CodeGenerator {
 	def static dispatch generateColors(Celebrate celebrate)''''''
 	
 	def static dispatch generateTimeout(FindLakes find)'''
-	FIND_LAKES_TIMEOUT = «find.duration.dl»
+	FIND_LAKES_TIMEOUT = «IF find.untilTermination !== null»sys.maxsize«ELSE»«find.duration.dl»«ENDIF»
 	lakes_found = False
 	
 	'''
 	def static dispatch generateTimeout(PushBricks push)'''
-	PUSH_BRICKS_TIMEOUT = «push.duration.dl»
+	PUSH_BRICKS_TIMEOUT = «IF push.untilTermination !== null»sys.maxsize«ELSE»«push.duration.dl»«ENDIF»
 	initial_number_of_bircks = «push.number»
 	bricks_pushed = False
 	bricks_to_push = initial_number_of_bricks
