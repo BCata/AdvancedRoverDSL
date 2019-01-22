@@ -13,8 +13,8 @@ YELLOW = get_yellow()
 
 measurements = {
     RED: (),
-    BLUE: ("temp", "depth", "sal"),
-    GREEN: ("temp", "sal")
+    BLUE: ("temperature", "depth", "salinity"),
+    GREEN: ("temperature", "salinity")
 }
 
 cs_left = get_left_sensor()
@@ -39,11 +39,11 @@ def get_measurements():
 
 
 def generate_measurement_value(measurement):
-    if measurement == "temp":
+    if measurement == "temperature":
         return "temperature", str(round(random.uniform(-70, -50), 3)), "degrees"
     elif measurement == "depth":
         return "depth", str(round(random.uniform(5, 842), 3)), "meters"
-    elif measurement == "sal":
+    elif measurement == "salinity":
         return "salinity", str(round(random.uniform(0.1, 35), 3)), "per mille"
 
 
@@ -64,7 +64,7 @@ def position_rover_for_measurement(lake_color):
 
 
 def measure_lake(color):
-    if len(measurements[color]) != 0:
+    if color in measurements and len(measurements[color]) != 0:
         position_rover_for_measurement(color)
         lower_arm()
         for measure in measurements[color]:

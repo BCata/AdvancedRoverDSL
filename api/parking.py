@@ -15,8 +15,8 @@ cs_left = get_left_sensor()
 cs_middle = get_middle_sensor()
 cs_right = get_right_sensor()
 
-BLACK = get_black()
-WHITE = get_white()
+terrain_color = get_black()
+border_color = get_white()
 
 
 def found_parking_spot(color_sensor_tuple):
@@ -56,9 +56,9 @@ def move_to_border(border_color):
     while not on_the_border(detect_line(border_color)):
         move_both(15)
         # color_collision_protocol(detect_line(border_color))
-        color_collision_protocol([get_left_sensor().color != BLACK and get_left_sensor().color != WHITE,
-                                  get_middle_sensor().color != BLACK and get_middle_sensor().color != WHITE,
-                                  get_right_sensor().color != BLACK and get_right_sensor().color != WHITE])
+        color_collision_protocol([get_left_sensor().color != terrain_color and get_left_sensor().color != border_color,
+                                  get_middle_sensor().color != terrain_color and get_middle_sensor().color != border_color,
+                                  get_right_sensor().color != terrain_color and get_right_sensor().color != border_color])
         ultrasonic_back_collision_protocol()
         # print("Calling ultrasonic front:")
         detect_ultrasonic_front()
@@ -95,12 +95,12 @@ def move_to_corner(border_color, direction="forward"):
         move_both_in_direction(15, direction)
         cs = detect_color()
 
-        if cs[0] == WHITE or cs[1] == WHITE or cs[2] == WHITE:
+        if cs[0] == border_color or cs[1] == border_color or cs[2] == border_color:
             continue
 
         if arb.read_message()[0] == "ultrasonic" \
                 or arb.read_message()[0] == "touch" \
-                or (cs[0] != BLACK or cs[1] != BLACK or cs[2] != BLACK):
+                or (cs[0] != terrain_color or cs[1] != terrain_color or cs[2] != terrain_color):
                     arb.set_message(("clear", None))
                     direction = toggle_direction(direction)
                     move_both_in_direction(15, direction, 1)
